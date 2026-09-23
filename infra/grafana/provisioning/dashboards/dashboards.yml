@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: shopbot
+    folder: ShopBot
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

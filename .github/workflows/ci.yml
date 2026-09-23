@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Lint + unit checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run pytest -q
+
+  frontend:
+    name: Type-check + build UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  smoke:
+    name: Docker stack smoke test (offline, deterministic)
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure fake LLM + fake embeddings (no API keys, no Ollama)
+        run: |
+          cp .env.example .env
+          sed -i 's/^LLM_PROVIDER=.*/LLM_PROVIDER=fake/; s/^LLM_FALLBACKS=.*/LLM_FALLBACKS=/' .env
+          sed -i 's/^EMBEDDING_PROVIDER=.*/EMBEDDING_PROVIDER=fake/; s/^GUARDRAIL_CLASSIFIER=.*/GUARDRAIL_CLASSIFIER=off/' .env
+          sed -i 's/^RATE_LIMIT_PER_MINUTE=.*/RATE_LIMIT_PER_MINUTE=0/' .env
+      - run: docker compose build chat-service
+      - run: docker compose up -d --wait postgres redis
+      - run: docker compose run --rm --no-deps seed
+      - run: docker compose run --rm --no-deps ingest
+      - run: docker compose up -d --no-deps --wait catalog-service order-service chat-service gateway
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run python -m scripts.smoke_test
+      - if: failure()
+        run: docker compose logs --tail 200

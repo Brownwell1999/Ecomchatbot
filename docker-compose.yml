@@ -1,0 +1,164 @@
+name: shopbot
+
+x-python-service: &python-service
+  build: .
+  image: shopbot-python:latest
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shopbot}:${POSTGRES_PASSWORD:-shopbot}@postgres:5432/${POSTGRES_DB:-shopbot}
+    REDIS_URL: redis://redis:6379/0
+    OLLAMA_API_BASE: http://ollama:11434
+    CHAT_SERVICE_URL: http://chat-service:8001
+    CATALOG_SERVICE_URL: http://catalog-service:8002
+    ORDER_SERVICE_URL: http://order-service:8003
+
+services:
+  # ---------------- Layer 4: data ----------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shopbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shopbot}
+      POSTGRES_DB: ${POSTGRES_DB:-shopbot}
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Local LLM (free, offline). Not needed once you use Groq/Gemini, but kept as fallback.
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: [ollama:/root/.ollama]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # Pulls the chat fallback model and the embedding model (first run only, ~2.3 GB)
+  ollama-pull:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["sh", "-c", "ollama pull llama3.2:3b && ollama pull nomic-embed-text"]
+    depends_on:
+      ollama: { condition: service_healthy }
+    restart: "no"
+
+  # One-shot: create schema + deterministic seed data.  docker compose run --rm seed
+  seed:
+    <<: *python-service
+    command: ["python", "-m", "scripts.seed_db"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    profiles: ["tools"]
+    restart: "no"
+
+  # One-shot: chunk + embed knowledge base and products into pgvector.  docker compose run --rm ingest
+  ingest:
+    <<: *python-service
+    command: ["python", "-m", "scripts.ingest_docs"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      ollama: { condition: service_healthy }
+    profiles: ["tools"]
+    restart: "no"
+
+  # ---------------- Layer 3: microservices ----------------
+  catalog-service:
+    <<: *python-service
+    command: ["uvicorn", "services.catalog_service.app.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    ports: ["8002:8002"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  order-service:
+    <<: *python-service
+    command: ["uvicorn", "services.order_service.app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+    ports: ["8003:8003"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  chat-service:
+    <<: *python-service
+    command: ["uvicorn", "services.chat_service.app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports: ["8001:8001"]
+    depends_on:
+      redis: { condition: service_healthy }
+      ollama: { condition: service_healthy }
+      catalog-service: { condition: service_healthy }
+      order-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ---------------- Layer 2: API gateway ----------------
+  gateway:
+    <<: *python-service
+    command: ["uvicorn", "services.gateway.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: ["8000:8000"]
+    depends_on:
+      chat-service: { condition: service_healthy }
+      order-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ---------------- Layer 1: presentation ----------------
+  frontend:
+    build: ./frontend
+    ports: ["5173:80"]
+    depends_on:
+      gateway: { condition: service_healthy }
+
+  # ---------------- Layer 5: monitoring ----------------
+  prometheus:
+    image: prom/prometheus:latest
+    ports: ["9090:9090"]
+    volumes: ["./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/shopbot.json
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+
+volumes:
+  pgdata:
+  ollama:
