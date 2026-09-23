@@ -6,6 +6,8 @@ security/red-team, performance).
 
 ## Architecture
 
+One-page diagram: [docs/architecture.pdf](docs/architecture.pdf)
+
 ```
 React UI (5173) ─GraphQL─► Gateway (8000) ─REST/SSE─► chat-service (8001) ──► LLM: Groq ⇢ Ollama (LangChain)
  Presentation   HTTP + WS  API gateway                │  Guardrails (input + output)
