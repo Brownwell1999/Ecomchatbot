@@ -113,10 +113,10 @@ Edit with `nano .env` and set at least these values:
 | `GROQ_API_KEY` | a **new** key from <https://console.groq.com> |
 | `JWT_SECRET` | output of `openssl rand -hex 32` |
 | `POSTGRES_PASSWORD` | a strong password (set it **before** the first deploy) |
-| `RATE_LIMIT_PER_MINUTE` | `10` |
-| `RATE_LIMIT_PER_DAY` | `100` (protects your Groq free quota) |
+| `PUBLIC_RATE_LIMIT_PER_MINUTE` | optional, default `10` |
+| `PUBLIC_RATE_LIMIT_PER_DAY` | optional, default `100` (protects your Groq free quota) |
 | `DOMAIN` | `shopbot-yourname.duckdns.org` (uncomment the line) |
-| `GRAFANA_ADMIN_PASSWORD` | a strong password (uncomment the line) |
+| `GRAFANA_ADMIN_PASSWORD` | optional: `deploy.sh` generates one if empty |
 | `DEMO_MODE` | `true` (uncomment the line) |
 
 Keep `BUSINESS_DATE` so the demo orders stay returnable. Never commit `.env`.
@@ -167,5 +167,5 @@ cd ~/Ecomchatbot && ./deploy.sh
 | Browser can't connect | Both firewalls (step 2); `docker compose -f docker-compose.yml -f docker-compose.prod.yml ps` |
 | Certificate error | DuckDNS IP matches the VM; ports 80 and 443 open. Logs: `… logs caddy` |
 | "ShopBot is temporarily unavailable" | Groq key or quota; Ollama fallback is slow on CPU. Logs: `… logs chat-service` |
-| "Too many messages" | Rate limits in `.env`, then `./deploy.sh` |
+| "Too many messages" | `PUBLIC_RATE_LIMIT_PER_*` in `.env`, then `./deploy.sh` |
 | Anything else | `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail 100` |
