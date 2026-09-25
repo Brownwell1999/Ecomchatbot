@@ -111,6 +111,7 @@ def ungrounded_numbers(reply: str, grounding: str) -> list[str]:
 class Guardrails:
     def __init__(self, settings: Settings, system_prompts: list[str]):
         self.threshold = settings.guardrail_injection_threshold
+        self.classifier_min_words = settings.guardrail_classifier_min_words
         self.classifier = None
         if settings.guardrail_classifier == "groq" and settings.groq_api_key:
             self.classifier = ChatGroq(model_name=settings.guardrail_classifier_model,
@@ -134,7 +135,8 @@ class Guardrails:
         if m := INJECTION_RE.search(message):
             results.append(GuardrailResult(name="prompt_injection", stage="input", passed=False,
                                            action="block", detail=f"pattern: {m.group()[:60]}"))
-        elif self.classifier is not None and not results:  # nothing blocked yet
+        elif (self.classifier is not None and not results  # nothing blocked yet
+              and len(message.split()) >= self.classifier_min_words):
             score = await self._injection_score(masked)
             if score is not None:
                 blocked = score >= self.threshold

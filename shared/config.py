@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     guardrail_classifier: str = "groq"  # groq (Llama Prompt Guard 2) | off
     guardrail_classifier_model: str = "meta-llama/llama-prompt-guard-2-86m"
     guardrail_injection_threshold: float = 0.8
+    # Prompt Guard over-flags short commands ("Show my recent orders" = 0.999); on a 23-message
+    # check every false positive was <= 4 words and every attack it alone caught was >= 6 words.
+    # Short attacks are left to the regex layer.
+    guardrail_classifier_min_words: int = 6
 
     # Production hardening
     rate_limit_per_minute: int = 20  # chat messages per user/IP per minute; 0 = off
