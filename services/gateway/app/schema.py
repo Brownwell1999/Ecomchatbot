@@ -237,17 +237,19 @@ def _validate(text: str) -> str:
 
 
 async def _rate_limit(info: Info, user_id: int | None) -> None:
-    """Fixed one-minute window per signed-in user (or client IP), shared across replicas."""
-    limit = settings.rate_limit_per_minute
-    if not limit:
-        return
-    window = int(time.time() // 60)
-    key = f"ratelimit:{user_id or info.context['client_ip']}:{window}"
-    async with info.context["redis"].pipeline(transaction=True) as pipe:
-        count, _ = await pipe.incr(key).expire(key, 60).execute()
-    if count > limit:
-        raise _error("RATE_LIMITED", f"Too many messages. Limit is {limit} per minute.",
-                     retryAfterSeconds=60 - int(time.time()) % 60)
+    """Fixed per-minute and per-day windows per signed-in user (or client IP), in Redis so
+    every replica shares them."""
+    who, now = user_id or info.context["client_ip"], int(time.time())
+    for limit, seconds, label in ((settings.rate_limit_per_minute, 60, "minute"),
+                                  (settings.rate_limit_per_day, 86400, "day")):
+        if not limit:
+            continue
+        key = f"ratelimit:{label}:{who}:{now // seconds}"
+        async with info.context["redis"].pipeline(transaction=True) as pipe:
+            count, _ = await pipe.incr(key).expire(key, seconds).execute()
+        if count > limit:
+            raise _error("RATE_LIMITED", f"Too many messages. Limit is {limit} per {label}.",
+                         retryAfterSeconds=seconds - now % seconds)
 
 
 def _ws_user_id(info: Info) -> int | None:

@@ -1,0 +1,5 @@
+# Automatic HTTPS (Let's Encrypt) for $DOMAIN; WebSockets (streaming) are proxied as-is.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80
+}

@@ -188,7 +188,7 @@ async def verify(creds: Credentials, session: Session):
 @app.get("/users/demo", response_model=list[DemoUserOut])
 async def demo_users(session: Session, limit: Annotated[int, Query(ge=1, le=20)] = 6):
     """Demo accounts for the login picker (disabled in prod)."""
-    if not settings.debug_enabled:
+    if not (settings.debug_enabled or settings.demo_mode):
         raise HTTPException(status_code=404)
     stmt = (select(User, func.count(Order.id)).join(Order).group_by(User.id)
             .order_by(User.id).limit(limit))

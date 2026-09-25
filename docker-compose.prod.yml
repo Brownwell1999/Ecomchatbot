@@ -1,0 +1,45 @@
+# Production override for a single public server (used by ./deploy.sh):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Only Caddy (80/443, automatic HTTPS) is reachable from the internet; everything else is internal.
+
+x-internal: &internal
+  ports: !reset []
+  restart: unless-stopped
+
+x-app: &app
+  <<: *internal
+  environment:
+    APP_ENV: prod  # hides debug data, GraphiQL and /eval/* endpoints
+    DEMO_MODE: ${DEMO_MODE:-true}  # keep the demo-account picker for visitors
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. shopbot.duckdns.org}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [frontend]
+
+  gateway: *app
+  chat-service: *app
+  catalog-service: *app
+  order-service: *app
+  frontend: *internal
+  postgres: *internal
+  redis: *internal
+  ollama: *internal
+  prometheus: *internal
+  # Grafana stays private: reach it through an SSH tunnel (see docs/DEPLOY.md)
+  grafana:
+    <<: *internal
+    ports: !override ["127.0.0.1:3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+
+volumes:
+  caddy_data:

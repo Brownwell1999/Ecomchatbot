@@ -101,6 +101,10 @@ docker compose run --rm ingest       # chunk + embed knowledge base and products
 | http://localhost:3000 | Grafana dashboard (anonymous view; admin/admin to edit) |
 | http://localhost:9090 | Prometheus |
 
+**Public deployment:** [docs/DEPLOY.md](docs/DEPLOY.md) puts the same stack on a free Oracle Cloud
+VM with automatic HTTPS (Caddy): `docker-compose.prod.yml` exposes only ports 80/443, switches to
+prod mode, and `./deploy.sh` deploys or updates in one command.
+
 Try: "Show me running shoes under $100" → "Is the cheapest one in stock?" · "I need something to
 keep my coffee hot" · "Where is my order?" · "Return this order" → "yes" · "What is your return
 policy for electronics?" · "Do you offer student discounts?" (should say it doesn't know).

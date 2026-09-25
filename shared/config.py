@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     embedding_model: str = "nomic-embed-text"
     rag_top_k: int = 4
     rag_min_score: float = 0.55  # cosine relevance (0..1); below this we say "I don't know"
-    rag_score_margin: float = 0.05  # also drop chunks scoring > margin below the best hit
+    # Also drop chunks scoring more than this below the best hit. 0.05 lost recall on an
+    # 8-question check ("ship to India?" dropped its answer chunk); 0.10 = 7/8
+    rag_score_margin: float = 0.10
     kb_path: str = "data/knowledge_base"
 
     # Guardrails
@@ -39,6 +41,8 @@ class Settings(BaseSettings):
 
     # Production hardening
     rate_limit_per_minute: int = 20  # chat messages per user/IP per minute; 0 = off
+    rate_limit_per_day: int = 0  # per user/IP per day (protects the Groq free quota); 0 = off
+    demo_mode: bool = False  # public demo: keep the demo-account picker even in prod
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"
