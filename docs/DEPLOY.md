@@ -1,5 +1,32 @@
 # Deploy ShopBot publicly (free)
 
+Two options, both using the same hardened production setup (`docker-compose.prod.yml`):
+
+| | Option A: Cloudflare quick tunnel | Option B: server with a domain |
+|---|---|---|
+| Command | `./deploy.sh tunnel` | `./deploy.sh` |
+| Needs | Any machine running Docker (e.g. your laptop) | A VM (Oracle Always Free, Hetzner, …) + a domain |
+| URL | `https://<random>.trycloudflare.com`, **changes on every restart** | Your own fixed domain |
+| Online | While that machine and Docker are running | 24/7 |
+| Open ports | None (outbound tunnel) | 80, 443 |
+
+## Option A: Cloudflare quick tunnel (5 minutes, no account)
+
+1. Have the stack's `.env` ready (the same one you use locally).
+2. Run (Git Bash on Windows, or any shell on macOS/Linux):
+   ```bash
+   ./deploy.sh tunnel
+   ```
+3. It prints `Live at https://….trycloudflare.com`. Share that link.
+
+To stop sharing: `docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tunnel down`.
+Back to local development: `docker compose up -d --remove-orphans`.
+
+Behind the tunnel the gateway rate-limits by Cloudflare's `CF-Connecting-IP` header, so each
+visitor gets their own limit (10 messages/minute, 100/day by default: `PUBLIC_RATE_LIMIT_PER_*`).
+
+## Option B: your own server (24/7)
+
 Target: one **Oracle Cloud Always Free** VM (ARM, 4 CPUs, 24 GB RAM) running the same Docker
 Compose stack, with **Caddy** providing HTTPS and a free **DuckDNS** domain.
 Cost: $0. Time: about 45 minutes, most of it waiting for the first build.
@@ -99,6 +126,7 @@ Keep `BUSINESS_DATE` so the demo orders stay returnable. Never commit `.env`.
 ```bash
 ./deploy.sh
 ```
+(`./deploy.sh` defaults to the `https` profile: Caddy with automatic certificates.)
 
 The first run takes 15–25 minutes: it builds the images, downloads the Ollama models
 (~2.3 GB), seeds the demo data and builds the vector store. Caddy gets the HTTPS certificate

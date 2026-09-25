@@ -43,8 +43,9 @@ async def get_context(connection: HTTPConnection) -> dict:
     auth = connection.headers.get("authorization", "")
     token = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else ""
     user_id = decode_token(token, settings.jwt_secret) if token else None
-    # nginx sets X-Forwarded-For; direct callers fall back to the socket address
-    client_ip = (connection.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    # Header set by the trusted proxy in front (nginx/Caddy: X-Forwarded-For, Cloudflare
+    # tunnel: CF-Connecting-IP); direct callers fall back to the socket address
+    client_ip = (connection.headers.get(settings.client_ip_header, "").split(",")[0].strip()
                  or (connection.client.host if connection.client else "unknown"))
     return {"clients": connection.app.state.clients, "redis": connection.app.state.redis,
             "user_id": user_id, "client_ip": client_ip}

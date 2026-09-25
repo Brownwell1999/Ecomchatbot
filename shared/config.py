@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 20  # chat messages per user/IP per minute; 0 = off
     rate_limit_per_day: int = 0  # per user/IP per day (protects the Groq free quota); 0 = off
     demo_mode: bool = False  # public demo: keep the demo-account picker even in prod
+    client_ip_header: str = "x-forwarded-for"  # cf-connecting-ip behind a Cloudflare tunnel
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = "https://cloud.langfuse.com"

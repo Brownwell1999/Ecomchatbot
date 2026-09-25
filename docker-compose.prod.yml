@@ -1,6 +1,7 @@
-# Production override for a single public server (used by ./deploy.sh):
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-# Only Caddy (80/443, automatic HTTPS) is reachable from the internet; everything else is internal.
+# Production override for a public deployment. Pick how visitors reach it with a profile:
+#   --profile https   Caddy on 80/443 with automatic HTTPS (a server with a domain: ./deploy.sh)
+#   --profile tunnel  Cloudflare quick tunnel, no open ports or domain needed (./tunnel.sh)
+# Either way, every other service is internal-only.
 
 x-internal: &internal
   ports: !reset []
@@ -11,17 +12,28 @@ x-app: &app
   environment:
     APP_ENV: prod  # hides debug data, GraphiQL and /eval/* endpoints
     DEMO_MODE: ${DEMO_MODE:-true}  # keep the demo-account picker for visitors
+    RATE_LIMIT_PER_MINUTE: ${PUBLIC_RATE_LIMIT_PER_MINUTE:-10}
+    RATE_LIMIT_PER_DAY: ${PUBLIC_RATE_LIMIT_PER_DAY:-100}  # protects the Groq free quota
+    CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-x-forwarded-for}
 
 services:
   caddy:
     image: caddy:2-alpine
+    profiles: ["https"]
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. shopbot.duckdns.org}
+      DOMAIN: ${DOMAIN:-localhost}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
+    depends_on: [frontend]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--url", "http://frontend:80"]
     depends_on: [frontend]
 
   gateway: *app
@@ -33,7 +45,7 @@ services:
   redis: *internal
   ollama: *internal
   prometheus: *internal
-  # Grafana stays private: reach it through an SSH tunnel (see docs/DEPLOY.md)
+  # Grafana stays private: http://localhost:3000 on the host (or via an SSH tunnel)
   grafana:
     <<: *internal
     ports: !override ["127.0.0.1:3000:3000"]
