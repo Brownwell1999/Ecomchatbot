@@ -137,6 +137,8 @@ services:
   frontend:
     build: ./frontend
     ports: ["5173:80"]
+    # One URL for testing everything: /api/chat/, /api/catalog/, /api/orders/, /api/gateway/
+    volumes: ["./infra/nginx/dev-routes.conf:/etc/nginx/dev-routes/routes.conf:ro"]
     depends_on:
       gateway: { condition: service_healthy }
 

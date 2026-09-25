@@ -93,6 +93,22 @@ docker compose run --rm seed         # schema + deterministic demo data
 docker compose run --rm ingest       # chunk + embed knowledge base and products into pgvector
 ```
 
+### One URL for testing everything: `http://localhost:5173`
+
+In dev/test mode every part of the chatbot is reachable under the UI's origin (nginx routes in
+`infra/nginx/dev-routes.conf`; production removes them because the services trust internal headers):
+
+| Path | What |
+|---|---|
+| `/` | Chat UI (demo customers, password `demo123`) |
+| `/graphql` | Public GraphQL API + GraphiQL playground (queries, mutations, streaming subscription) |
+| `/api/chat/docs` | chat-service Swagger: `/chat`, `/chat/stream` (SSE), `/eval/nlu`, `/eval/retrieve`, `/eval/guardrails`, `/feedback` |
+| `/api/catalog/docs` | catalog-service Swagger: product search and details |
+| `/api/orders/docs` | order-service Swagger: orders, returns, auth (send `X-User-Id`) |
+| `/api/gateway/ready` · `/api/*/metrics` | Health checks and Prometheus metrics of each service |
+
+Direct ports still work too:
+
 | URL | What |
 |---|---|
 | http://localhost:5173 | Chat UI (sign in with a demo customer, password `demo123`) |

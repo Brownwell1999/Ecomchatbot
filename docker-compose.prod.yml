@@ -40,7 +40,9 @@ services:
   chat-service: *app
   catalog-service: *app
   order-service: *app
-  frontend: *internal
+  frontend:
+    <<: *internal
+    volumes: !reset []  # no internal-API test routes in production
   postgres: *internal
   redis: *internal
   ollama: *internal

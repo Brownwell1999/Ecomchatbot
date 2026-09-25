@@ -17,6 +17,7 @@ from shared.db.models import Feedback
 from shared.db.session import make_engine, make_sessionmaker
 from shared.logging import RequestIdMiddleware, log_event, request_id_var, setup_logging
 from shared.metrics import instrument
+from shared.proxy import ForwardedPrefixMiddleware
 
 from . import metrics
 from .graph import ChatGraph, Trace
@@ -110,6 +111,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ShopBot chat-service", version="0.3.0", lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(ForwardedPrefixMiddleware)
 instrument(app, "chat-service")
 
 

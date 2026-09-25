@@ -14,6 +14,7 @@ from shared.db.models import Product
 from shared.db.session import make_engine, make_sessionmaker
 from shared.logging import RequestIdMiddleware, setup_logging
 from shared.metrics import instrument
+from shared.proxy import ForwardedPrefixMiddleware
 
 settings = get_settings()
 logger = setup_logging("catalog_service", settings.log_level)
@@ -54,6 +55,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ShopBot catalog-service", version="0.2.0", lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(ForwardedPrefixMiddleware)
 instrument(app, "catalog-service")
 
 

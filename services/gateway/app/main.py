@@ -13,6 +13,7 @@ from strawberry.fastapi import GraphQLRouter
 from shared.config import get_settings
 from shared.logging import RequestIdMiddleware, log_event, setup_logging
 from shared.metrics import instrument
+from shared.proxy import ForwardedPrefixMiddleware
 from shared.security import decode_token
 
 from .clients import ServiceClients
@@ -59,6 +60,7 @@ graphql_router = GraphQLRouter(
 
 app = FastAPI(title="ShopBot gateway", version="0.1.0", lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(ForwardedPrefixMiddleware)
 instrument(app, "gateway")
 app.add_middleware(
     CORSMiddleware,

@@ -20,6 +20,7 @@ from shared.db.models import Order, OrderItem, ReturnRequest, User
 from shared.db.session import make_engine, make_sessionmaker
 from shared.logging import RequestIdMiddleware, setup_logging
 from shared.metrics import instrument
+from shared.proxy import ForwardedPrefixMiddleware
 from shared.security import verify_password
 
 settings = get_settings()
@@ -104,6 +105,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ShopBot order-service", version="0.2.0", lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(ForwardedPrefixMiddleware)
 instrument(app, "order-service")
 
 
