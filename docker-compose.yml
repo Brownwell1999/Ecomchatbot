@@ -2,6 +2,7 @@ name: shopbot
 
 x-python-service: &python-service
   build: .
+  restart: unless-stopped
   image: shopbot-python:latest
   env_file:
     - path: .env
@@ -17,6 +18,7 @@ x-python-service: &python-service
 services:
   # ---------------- Layer 4: data ----------------
   postgres:
+    restart: unless-stopped
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-shopbot}
@@ -31,6 +33,7 @@ services:
       retries: 20
 
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     ports: ["6379:6379"]
     healthcheck:
@@ -41,6 +44,7 @@ services:
 
   # Local LLM (free, offline). Not needed once you use Groq/Gemini, but kept as fallback.
   ollama:
+    restart: unless-stopped
     image: ollama/ollama:latest
     ports: ["11434:11434"]
     volumes: [ollama:/root/.ollama]
@@ -135,6 +139,7 @@ services:
 
   # ---------------- Layer 1: presentation ----------------
   frontend:
+    restart: unless-stopped
     build: ./frontend
     ports: ["5173:80"]
     # One URL for testing everything: /api/chat/, /api/catalog/, /api/orders/, /api/gateway/
@@ -144,11 +149,13 @@ services:
 
   # ---------------- Layer 5: monitoring ----------------
   prometheus:
+    restart: unless-stopped
     image: prom/prometheus:latest
     ports: ["9090:9090"]
     volumes: ["./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
 
   grafana:
+    restart: unless-stopped
     image: grafana/grafana:latest
     ports: ["3000:3000"]
     environment:
