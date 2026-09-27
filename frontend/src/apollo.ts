@@ -4,21 +4,32 @@ import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { createClient } from "graphql-ws";
 
-export const TOKEN_KEY = "shopbot.token";
+export const TOKEN_KEY = "shopbot.token"; // ShopBot demo customer (orders/returns lessons)
+export const LAB_TOKEN_KEY = "lab.token"; // AI Testing Lab account
 const GRAPHQL_PATH = import.meta.env.VITE_GRAPHQL_URL ?? "/graphql";
 
-export function readToken(): string | null {
+function read(key: string): string | null {
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
+export const readToken = () => read(TOKEN_KEY);
+export const readLabToken = () => read(LAB_TOKEN_KEY);
+
 // Queries/mutations over HTTP with the JWT header
 const authLink = setContext((_, { headers }) => {
   const token = readToken();
-  return { headers: { ...headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) } };
+  const labToken = readLabToken();
+  return {
+    headers: {
+      ...headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(labToken ? { "X-Lab-Token": labToken } : {}),
+    },
+  };
 });
 const httpLink = authLink.concat(new HttpLink({ uri: GRAPHQL_PATH }));
 
@@ -31,7 +42,8 @@ export const wsClient = createClient({
   lazy: true,
   connectionParams: () => {
     const token = readToken();
-    return token ? { authorization: `Bearer ${token}` } : {};
+    const labToken = readLabToken();
+    return { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(labToken ? { labToken } : {}) };
   },
 });
 const wsLink = new GraphQLWsLink(wsClient);

@@ -15,6 +15,7 @@ x-app: &app
     RATE_LIMIT_PER_MINUTE: ${PUBLIC_RATE_LIMIT_PER_MINUTE:-10}
     RATE_LIMIT_PER_DAY: ${PUBLIC_RATE_LIMIT_PER_DAY:-100}  # protects the Groq free quota
     CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-x-forwarded-for}
+    LAB_AUTH_REQUIRED: "true"  # only signed-in AI Testing Lab users may chat with ShopBot
 
 services:
   caddy:

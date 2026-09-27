@@ -44,12 +44,16 @@ async def get_context(connection: HTTPConnection) -> dict:
     auth = connection.headers.get("authorization", "")
     token = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else ""
     user_id = decode_token(token, settings.jwt_secret) if token else None
+    # AI Testing Lab identity travels separately, so a learner can also sign in as a ShopBot
+    # demo customer (Authorization) inside the playground
+    lab_token = connection.headers.get("x-lab-token", "").strip()
+    lab_user_id = decode_token(lab_token, settings.jwt_secret, scope="lab") if lab_token else None
     # Header set by the trusted proxy in front (nginx/Caddy: X-Forwarded-For, Cloudflare
     # tunnel: CF-Connecting-IP); direct callers fall back to the socket address
     client_ip = (connection.headers.get(settings.client_ip_header, "").split(",")[0].strip()
                  or (connection.client.host if connection.client else "unknown"))
     return {"clients": connection.app.state.clients, "redis": connection.app.state.redis,
-            "user_id": user_id, "client_ip": client_ip}
+            "user_id": user_id, "lab_user_id": lab_user_id, "client_ip": client_ip}
 
 
 graphql_router = GraphQLRouter(

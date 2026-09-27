@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useChat } from "../hooks/useChat";
 import { ChatInput } from "./ChatInput";
 import { LoginPanel } from "./LoginPanel";
 import { MessageList } from "./MessageList";
+import type { DebugInfo } from "../types";
 
 const SUGGESTIONS = [
   "Show me running shoes under $100",
@@ -12,11 +13,21 @@ const SUGGESTIONS = [
   "I need something to keep my coffee hot",
 ];
 
-export function ChatWidget() {
+interface Props {
+  /** Lesson prompts shown as "Try it" chips above the input (AI Testing Lab). */
+  prompts?: string[];
+  /** Receives the debug trace of the latest bot reply (AI Testing Lab inspector). */
+  onDebug?: (debug: DebugInfo | null) => void;
+}
+
+export function ChatWidget({ prompts, onDebug }: Props) {
   const { user, checking, login, logout } = useAuth();
   const { conversationId, messages, pending, restoring, error, send, retry, sendFeedback, newChat } = useChat();
   const [showLogin, setShowLogin] = useState(false);
   const empty = messages.length === 0 && !restoring;
+  const latestDebug = [...messages].reverse().find((m) => m.role === "assistant")?.debug ?? null;
+
+  useEffect(() => onDebug?.(latestDebug), [latestDebug, onDebug]);
 
   // A new identity gets a fresh conversation, so one customer's context never leaks to another
   async function handleLogin(email: string, password: string) {
@@ -82,6 +93,17 @@ export function ChatWidget() {
           {error.message}
         </div>
       )}
+
+      {prompts?.length ? (
+        <div className="try-it" data-testid="try-it">
+          <span>Try it:</span>
+          {prompts.map((p) => (
+            <button key={p} className="chip" onClick={() => send(p)} disabled={pending || showLogin} data-testid="try-prompt">
+              {p}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <ChatInput onSend={send} disabled={pending || restoring || showLogin} />
       <footer className="chat-footer" data-testid="conversation-id" data-conversation-id={conversationId ?? ""}>

@@ -1,44 +1,48 @@
+/* Theme tokens: dark by default, light via <html data-theme="light"> (set before render in index.html) */
 :root {
-  --ok: #15803d;
-  --warn: #b45309;
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --surface-2: #f0f2f5;
-  --text: #1c1f24;
-  --text-muted: #6b7280;
-  --border: #e3e6ea;
-  --brand: #4f46e5;
+  --bg: #0a0c14;
+  --surface: #121624;
+  --surface-2: #1a1f31;
+  --text: #e8eaf3;
+  --text-muted: #9aa3b8;
+  --border: rgba(255, 255, 255, 0.09);
+  --brand: #8b7cff;
   --brand-contrast: #ffffff;
-  --user-bubble: #4f46e5;
+  --accent-1: #8b5cf6;
+  --accent-2: #22d3ee;
+  --glass: rgba(20, 24, 40, 0.62);
+  --user-bubble: linear-gradient(135deg, #7c5cff, #5b6cff);
   --user-text: #ffffff;
-  --bot-bubble: #f0f2f5;
-  --danger: #c0262d;
-  --danger-bg: #fdecec;
+  --bot-bubble: #1a1f31;
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.12);
+  --ok: #4ade80;
+  --warn: #fbbf24;
   --radius: 16px;
-  --shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
-  color-scheme: light dark;
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1115;
-    --surface: #171a21;
-    --surface-2: #1f232c;
-    --text: #e8eaee;
-    --text-muted: #9aa1ad;
-    --border: #2a2f3a;
-    --brand: #818cf8;
-    --brand-contrast: #0f1115;
-    --user-bubble: #6366f1;
-    --user-text: #ffffff;
-    --bot-bubble: #1f232c;
-    --danger: #f87171;
-    --danger-bg: #3a1a1c;
-    --ok: #4ade80;
-    --warn: #fbbf24;
-    --shadow: none;
-  }
+:root[data-theme="light"] {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f0f2f8;
+  --text: #121526;
+  --text-muted: #5b6478;
+  --border: #e3e6ef;
+  --brand: #6d4aff;
+  --accent-1: #7c3aed;
+  --accent-2: #0891b2;
+  --glass: rgba(255, 255, 255, 0.72);
+  --user-bubble: linear-gradient(135deg, #6d4aff, #4f5bff);
+  --bot-bubble: #f0f2f8;
+  --danger: #c0262d;
+  --danger-bg: #fdecec;
+  --ok: #15803d;
+  --warn: #b45309;
+  --shadow: 0 20px 50px rgba(30, 35, 70, 0.1);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }

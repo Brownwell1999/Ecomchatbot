@@ -1,9 +1,9 @@
-"""Relational schema: users, catalog, orders, returns, and chat feedback."""
+"""Relational schema: users, catalog, orders, returns, chat feedback, AI Testing Lab accounts."""
 
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, Text, func
+from sqlalchemy import ForeignKey, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -96,3 +96,31 @@ class Feedback(Base):
     user_message: Mapped[str | None] = mapped_column(Text)
     bot_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+# ---------- AI Testing Lab (own metadata: seed_db.py's drop_all never touches it) ----------
+class LabBase(DeclarativeBase):
+    pass
+
+
+class LabUser(LabBase):
+    __tablename__ = "lab_users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    full_name: Mapped[str] = mapped_column(String(100))
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(20), default="learner")  # learner | admin
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    last_login_at: Mapped[datetime | None]
+
+
+class LabProgress(LabBase):
+    __tablename__ = "lab_progress"
+    __table_args__ = (UniqueConstraint("user_id", "lesson_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("lab_users.id", ondelete="CASCADE"), index=True)
+    lesson_id: Mapped[str] = mapped_column(String(50))
+    completed_at: Mapped[datetime] = mapped_column(server_default=func.now())

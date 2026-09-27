@@ -22,10 +22,10 @@ const RESPONSE_FIELDS = gql`
     conversationId
     message { ...MessageFields }
     debug {
-      requestId promptVersion latencyMs intent confidence nluSource entities route fallbackUsed
-      toolCalls { name args ok latencyMs }
+      requestId promptVersion latencyMs intent confidence nluSource entities route fallbackUsed historyMessagesUsed
+      toolCalls { name args output ok latencyMs error }
       llmCalls { step provider model latencyMs inputTokens outputTokens }
-      retrievedChunks { chunkId collection section score used }
+      retrievedChunks { chunkId collection source section score used content }
       guardrails { name stage passed action score detail }
     }
   }
@@ -85,5 +85,58 @@ export const ME = gql`
 export const DEMO_USERS = gql`
   query DemoUsers {
     demoUsers { id email fullName orderCount }
+  }
+`;
+
+// ---------- AI Testing Lab ----------
+const LAB_USER_FIELDS = gql`
+  fragment LabUserFields on LabUser {
+    id email fullName role active createdAt lastLoginAt
+  }
+`;
+
+export const LAB_SIGNUP = gql`
+  ${LAB_USER_FIELDS}
+  mutation LabSignup($input: LabSignupInput!) {
+    labSignup(input: $input) { token user { ...LabUserFields } }
+  }
+`;
+
+export const LAB_LOGIN = gql`
+  ${LAB_USER_FIELDS}
+  mutation LabLogin($email: String!, $password: String!) {
+    labLogin(email: $email, password: $password) { token user { ...LabUserFields } }
+  }
+`;
+
+export const LAB_ME = gql`
+  ${LAB_USER_FIELDS}
+  query LabMe {
+    labMe { ...LabUserFields }
+  }
+`;
+
+export const LAB_PROGRESS = gql`
+  query LabProgress {
+    labProgress { lessonId completedAt }
+  }
+`;
+
+export const COMPLETE_LESSON = gql`
+  mutation CompleteLesson($lessonId: String!) {
+    completeLesson(lessonId: $lessonId) { lessonId completedAt }
+  }
+`;
+
+export const LAB_USERS = gql`
+  query LabUsers {
+    labUsers { id email fullName role active createdAt lastLoginAt lessonsCompleted }
+  }
+`;
+
+export const LAB_UPDATE_USER = gql`
+  ${LAB_USER_FIELDS}
+  mutation LabUpdateUser($id: Int!, $role: String, $active: Boolean) {
+    labUpdateUser(id: $id, role: $role, active: $active) { ...LabUserFields }
   }
 `;

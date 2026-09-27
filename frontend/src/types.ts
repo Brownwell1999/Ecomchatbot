@@ -38,9 +38,10 @@ export interface DebugInfo {
   entities: Record<string, unknown>;
   route: string;
   fallbackUsed: boolean;
-  toolCalls: { name: string; args: Record<string, unknown>; ok: boolean; latencyMs: number }[];
+  historyMessagesUsed?: number;
+  toolCalls: { name: string; args: Record<string, unknown>; output: unknown; ok: boolean; latencyMs: number; error: string | null }[];
   llmCalls: { step: string; provider: string; model: string; latencyMs: number; inputTokens: number | null; outputTokens: number | null }[];
-  retrievedChunks: { chunkId: string; collection: string; section: string; score: number; used: boolean }[];
+  retrievedChunks: { chunkId: string; collection: string; source: string; section: string; score: number; used: boolean; content: string }[];
   guardrails: { name: string; stage: string; passed: boolean; action: string; score: number | null; detail: string }[];
 }
 
@@ -66,4 +67,23 @@ export interface User {
   id: number;
   email: string;
   fullName: string;
+}
+
+export interface LabUser {
+  id: number;
+  email: string;
+  fullName: string;
+  role: "learner" | "admin";
+  active: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface LabUserAdmin extends LabUser {
+  lessonsCompleted: number;
+}
+
+export interface LessonProgress {
+  lessonId: string;
+  completedAt: string;
 }

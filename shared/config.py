@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-change-me"
     jwt_ttl_minutes: int = 120
 
+    # AI Testing Lab
+    # true (prod): chatting with ShopBot needs a signed-in lab user. false (dev/test): anonymous
+    # chat still works, so the pytest/DeepEval framework can call ShopBot directly.
+    lab_auth_required: bool = False
+    lab_token_ttl_minutes: int = 720
+    lab_admin_email: str = ""  # both set -> this admin is created on order-service start
+    lab_admin_password: str = ""
+    lab_auth_rate_limit_per_minute: int = 10  # sign-up/login attempts per IP; 0 = off
+
     # Fixed "today" for deterministic return-window checks, e.g. 2026-09-01T12:00:00
     business_date: datetime | None = None
 

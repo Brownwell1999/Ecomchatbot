@@ -12,6 +12,8 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = Field(default=None, pattern=CONVERSATION_ID_PATTERN)
     message: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
     user_id: int | None = None  # set by the gateway from the JWT, never by the browser
+    # Set by the gateway for signed-in AI Testing Lab users: the debug trace is the lesson material
+    include_debug: bool = False
 
     @field_validator("message")
     @classmethod

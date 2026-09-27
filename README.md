@@ -4,6 +4,30 @@ A production-style chatbot for a fictional store (**ShopEase**), built step by s
 system under test for an **AI test automation framework** (API, UI E2E, LLM evals, RAG evals,
 security/red-team, performance).
 
+## AI Testing Lab (the web app)
+
+The frontend is an **AI Testing Lab**: a learning site where signed-in users learn AI testing by
+using ShopBot.
+
+| Route | What it is |
+|---|---|
+| `/` | Landing page (features, curriculum, FAQ) |
+| `/signup`, `/login` | Self sign-up (instant access) and log-in |
+| `/lab` | Dashboard: progress ring, lesson cards |
+| `/lab/lessons/:id` | 8 lessons: concept, "Try it" prompts, what to inspect, a DeepEval snippet, mark complete |
+| `/lab/playground` | ShopBot chat + **Inspector** (intent, entities, retrieved chunks, tools, guardrails, LLM calls) |
+| `/admin` | Admins: users, roles, enable/disable, progress |
+| `/privacy`, `/terms` | Legal pages (templates, review before launch) |
+
+- **Roles:** `learner` (default) and `admin`. The first admin comes from `LAB_ADMIN_EMAIL` and
+  `LAB_ADMIN_PASSWORD` in `.env`, created when order-service starts.
+- **Access:** lab accounts are separate from ShopBot's demo customers (own tables, a JWT with
+  `scope: lab` in the `X-Lab-Token` header). Learners can still sign in as a demo customer inside the
+  chat for the order and return lessons.
+- **`LAB_AUTH_REQUIRED`:** `true` in production (only lab users may chat). `false` locally, so the
+  pytest/DeepEval framework keeps calling ShopBot anonymously. Lab users always get the `debug` trace,
+  even in production, because it's the lesson material.
+
 ## Architecture
 
 One-page diagram: [docs/architecture.pdf](docs/architecture.pdf)

@@ -115,7 +115,7 @@ class ChatService:
         )
         metrics.record_turn(debug)
         return ChatResponse(conversation_id=conversation_id, message=bot_msg,
-                            debug=debug if self._debug_enabled else None)
+                            debug=debug if self._debug_enabled or request.include_debug else None)
 
     async def _run_graph(self, state: dict, conversation_id: str, request: ChatRequest,
                          on_token: Callable[[str], Any] | None) -> dict:

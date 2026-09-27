@@ -23,6 +23,9 @@ from shared.metrics import instrument
 from shared.proxy import ForwardedPrefixMiddleware
 from shared.security import verify_password
 
+from .lab import ensure_lab_schema
+from .lab import router as lab_router
+
 settings = get_settings()
 logger = setup_logging("order_service", settings.log_level)
 
@@ -99,6 +102,7 @@ class ReturnOut(BaseModel):
 async def lifespan(app: FastAPI):
     engine = make_engine()
     app.state.sessions = make_sessionmaker(engine)
+    await ensure_lab_schema(engine, settings)
     yield
     await engine.dispose()
 
@@ -107,6 +111,7 @@ app = FastAPI(title="ShopBot order-service", version="0.2.0", lifespan=lifespan)
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(ForwardedPrefixMiddleware)
 instrument(app, "order-service")
+app.include_router(lab_router)
 
 
 async def get_session(request: Request):

@@ -1,8 +1,9 @@
 """Public GraphQL API (the only API the UI talks to)."""
 
+import re
 import time
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 
 import strawberry
 from graphql import GraphQLError
@@ -164,6 +165,36 @@ class AuthPayload:
 
 
 @strawberry.type
+class LabUser:
+    """An AI Testing Lab account (separate from ShopBot's demo customers)."""
+
+    id: int
+    email: str
+    full_name: str
+    role: str = strawberry.field(description="learner | admin")
+    active: bool
+    created_at: datetime
+    last_login_at: datetime | None
+
+
+@strawberry.type
+class LabUserAdmin(LabUser):
+    lessons_completed: int
+
+
+@strawberry.type
+class LabAuthPayload:
+    token: str
+    user: LabUser
+
+
+@strawberry.type
+class LessonProgress:
+    lesson_id: str
+    completed_at: datetime
+
+
+@strawberry.type
 class ChatStreamEvent:
     """type: token (partial text) | final (validated response) | error."""
 
@@ -188,7 +219,32 @@ class FeedbackInput:
     comment: str | None = None
 
 
+@strawberry.input
+class LabSignupInput:
+    email: str
+    full_name: str
+    password: str
+
+
 # ---------- dict -> type conversion ----------
+def _dt(value: str | None) -> datetime | None:
+    """DB timestamps are naive UTC; mark them as UTC so browsers don't read them as local time."""
+    if not value:
+        return None
+    parsed = datetime.fromisoformat(value)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def _lab_user(d: dict, cls: type = LabUser):
+    return cls(**{**d, "created_at": _dt(d["created_at"]),
+                  "last_login_at": _dt(d["last_login_at"])})
+
+
+def _progress(items: list[dict]) -> list[LessonProgress]:
+    return [LessonProgress(lesson_id=p["lesson_id"], completed_at=_dt(p["completed_at"]))
+            for p in items]
+
+
 def _message(d: dict) -> Message:
     order = d.get("order")
     return Message(
@@ -236,9 +292,9 @@ def _validate(text: str) -> str:
     return text
 
 
-async def _rate_limit(info: Info, user_id: int | None) -> None:
-    """Fixed per-minute and per-day windows per signed-in user (or client IP), in Redis so
-    every replica shares them."""
+async def _rate_limit(info: Info, user_id: int | str | None) -> None:
+    """Fixed per-minute and per-day windows per signed-in customer or lab user (or client IP),
+    in Redis so every replica shares them."""
     who, now = user_id or info.context["client_ip"], int(time.time())
     for limit, seconds, label in ((settings.rate_limit_per_minute, 60, "minute"),
                                   (settings.rate_limit_per_day, 86400, "day")):
@@ -265,6 +321,77 @@ def _clients(info: Info) -> ServiceClients:
     return info.context["clients"]
 
 
+# ---------- AI Testing Lab access ----------
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _lab_user_id(info: Info) -> int | None:
+    """Lab token from the X-Lab-Token header, or connectionParams.labToken on WebSockets."""
+    if info.context["lab_user_id"] is not None:
+        return info.context["lab_user_id"]
+    token = str((info.context.get("connection_params") or {}).get("labToken", "")).strip()
+    return decode_token(token, settings.jwt_secret, scope="lab") if token else None
+
+
+async def _current_lab_user(info: Info) -> dict | None:
+    """The signed-in, still-active lab user. Looked up on every call, so disabling an account
+    takes effect immediately even though its token hasn't expired."""
+    user_id = _lab_user_id(info)
+    if user_id is None:
+        return None
+    user = await _clients(info).lab_user(user_id)
+    return user if user and user["active"] else None
+
+
+async def _require_lab_user(info: Info) -> dict:
+    user = await _current_lab_user(info)
+    if user is None:
+        raise _error("UNAUTHENTICATED", "Sign in to the AI Testing Lab to continue.")
+    return user
+
+
+async def _require_admin(info: Info) -> dict:
+    user = await _require_lab_user(info)
+    if user["role"] != "admin":
+        raise _error("FORBIDDEN", "Admins only.")
+    return user
+
+
+async def _chat_access(info: Info) -> dict | None:
+    """Who may chat: anyone in dev/test, only lab users when LAB_AUTH_REQUIRED (prod).
+    A lab user also gets the debug trace - it is what the lessons inspect."""
+    if settings.lab_auth_required:
+        return await _require_lab_user(info)
+    return await _current_lab_user(info)
+
+
+async def _auth_rate_limit(info: Info) -> None:
+    """Sign-up/login attempts per client IP (brute-force protection)."""
+    limit = settings.lab_auth_rate_limit_per_minute
+    if not limit:
+        return
+    now = int(time.time())
+    key = f"ratelimit:labauth:{info.context['client_ip']}:{now // 60}"
+    async with info.context["redis"].pipeline(transaction=True) as pipe:
+        count, _ = await pipe.incr(key).expire(key, 60).execute()
+    if count > limit:
+        raise _error("RATE_LIMITED", "Too many attempts. Please wait a minute and try again.",
+                     retryAfterSeconds=60 - now % 60)
+
+
+def _validate_signup(data: LabSignupInput) -> tuple[str, str, str]:
+    email, name, password = data.email.strip().lower(), data.full_name.strip(), data.password
+    if not EMAIL_RE.match(email) or len(email) > 255:
+        raise _error("BAD_USER_INPUT", "Enter a valid email address.", field="email")
+    if not 1 <= len(name) <= 100:
+        raise _error("BAD_USER_INPUT", "Enter your name (up to 100 characters).", field="fullName")
+    if (len(password) < 8 or len(password) > 200 or not re.search(r"[A-Za-z]", password)
+            or not re.search(r"\d", password)):
+        raise _error("BAD_USER_INPUT", "Password needs at least 8 characters, "
+                     "including a letter and a number.", field="password")
+    return email, name, password
+
+
 # ---------- operations ----------
 @strawberry.type
 class Query:
@@ -286,11 +413,28 @@ class Query:
 
     @strawberry.field
     async def conversation(self, info: Info, id: str) -> Conversation | None:
+        await _chat_access(info)
         data = await _clients(info).get_conversation(id)
         if data is None:
             return None
         return Conversation(id=data["conversation_id"],
                             messages=[_message(m) for m in data["messages"]])
+
+    # ---------- AI Testing Lab ----------
+    @strawberry.field(description="The signed-in lab user, or null.")
+    async def lab_me(self, info: Info) -> LabUser | None:
+        user = await _current_lab_user(info)
+        return _lab_user(user) if user else None
+
+    @strawberry.field(description="Lessons the signed-in lab user has completed.")
+    async def lab_progress(self, info: Info) -> list[LessonProgress]:
+        user = await _require_lab_user(info)
+        return _progress(await _clients(info).lab_progress(user["id"]))
+
+    @strawberry.field(description="All lab accounts with progress (admins only).")
+    async def lab_users(self, info: Info) -> list[LabUserAdmin]:
+        await _require_admin(info)
+        return [_lab_user(u, LabUserAdmin) for u in await _clients(info).lab_users()]
 
 
 @strawberry.type
@@ -306,10 +450,12 @@ class Mutation:
     @strawberry.mutation
     async def send_message(self, info: Info, input: SendMessageInput) -> ChatResponse:
         text = _validate(input.text)
-        await _rate_limit(info, info.context["user_id"])
+        lab_user = await _chat_access(info)
+        user_id = info.context["user_id"]
+        await _rate_limit(info, user_id or (f"lab{lab_user['id']}" if lab_user else None))
         try:
-            data = await _clients(info).send_message(input.conversation_id, text,
-                                                     info.context["user_id"])
+            data = await _clients(info).send_message(input.conversation_id, text, user_id,
+                                                     include_debug=lab_user is not None)
         except UpstreamError as exc:
             raise _error(exc.code, str(exc)) from exc
         return _response(data)
@@ -318,6 +464,7 @@ class Mutation:
     async def submit_feedback(self, info: Info, input: FeedbackInput) -> bool:
         if input.rating not in (1, -1):
             raise _error("BAD_USER_INPUT", "rating must be 1 or -1.")
+        await _chat_access(info)
         return await _clients(info).send_feedback({
             "conversation_id": input.conversation_id, "message_id": input.message_id,
             "rating": input.rating, "comment": input.comment,
@@ -325,7 +472,53 @@ class Mutation:
 
     @strawberry.mutation
     async def clear_conversation(self, info: Info, id: str) -> bool:
+        await _chat_access(info)
         return await _clients(info).delete_conversation(id)
+
+    # ---------- AI Testing Lab ----------
+    @strawberry.mutation(description="Create a learner account and sign in.")
+    async def lab_signup(self, info: Info, input: LabSignupInput) -> LabAuthPayload:
+        await _auth_rate_limit(info)
+        email, name, password = _validate_signup(input)
+        try:
+            user = await _clients(info).lab_register(email, name, password)
+        except UpstreamError as exc:
+            raise _error(exc.code, str(exc)) from exc
+        token = create_token(user["id"], settings.jwt_secret, settings.lab_token_ttl_minutes, "lab")
+        return LabAuthPayload(token=token, user=_lab_user(user))
+
+    @strawberry.mutation
+    async def lab_login(self, info: Info, email: str, password: str) -> LabAuthPayload:
+        await _auth_rate_limit(info)
+        try:
+            user = await _clients(info).lab_verify(email.strip().lower(), password)
+        except UpstreamError as exc:
+            raise _error(exc.code, str(exc)) from exc
+        token = create_token(user["id"], settings.jwt_secret, settings.lab_token_ttl_minutes, "lab")
+        return LabAuthPayload(token=token, user=_lab_user(user))
+
+    @strawberry.mutation(description="Mark a lesson done; returns all completed lessons.")
+    async def complete_lesson(self, info: Info, lesson_id: str) -> list[LessonProgress]:
+        user = await _require_lab_user(info)
+        try:
+            return _progress(await _clients(info).lab_complete_lesson(user["id"], lesson_id))
+        except UpstreamError as exc:
+            raise _error(exc.code, str(exc)) from exc
+
+    @strawberry.mutation(description="Change a lab user's role or enable/disable them "
+                                     "(admins only).")
+    async def lab_update_user(self, info: Info, id: int, role: str | None = None,
+                              active: bool | None = None) -> LabUser:
+        admin = await _require_admin(info)
+        if role is not None and role not in ("learner", "admin"):
+            raise _error("BAD_USER_INPUT", "role must be learner or admin.")
+        if id == admin["id"] and (active is False or role == "learner"):
+            raise _error("BAD_USER_INPUT", "You can't disable or demote your own account.")
+        changes = {k: v for k, v in {"role": role, "active": active}.items() if v is not None}
+        user = await _clients(info).lab_update_user(id, changes)
+        if user is None:
+            raise _error("NOT_FOUND", "User not found.")
+        return _lab_user(user)
 
 
 @strawberry.type
@@ -336,9 +529,11 @@ class Subscription:
         """Same as sendMessage, but streams tokens (graphql-ws). The final event carries the
         guardrail-validated reply, which replaces the streamed text."""
         text = _validate(input.text)
+        lab_user = await _chat_access(info)
         user_id = _ws_user_id(info)
-        await _rate_limit(info, user_id)
-        async for event in _clients(info).stream_message(input.conversation_id, text, user_id):
+        await _rate_limit(info, user_id or (f"lab{lab_user['id']}" if lab_user else None))
+        async for event in _clients(info).stream_message(input.conversation_id, text, user_id,
+                                                         include_debug=lab_user is not None):
             if event["type"] == "token":
                 yield ChatStreamEvent(type="token", token=event["text"])
             elif event["type"] == "final":

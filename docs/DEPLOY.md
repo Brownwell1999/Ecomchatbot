@@ -118,8 +118,13 @@ Edit with `nano .env` and set at least these values:
 | `DOMAIN` | `shopbot-yourname.duckdns.org` (uncomment the line) |
 | `GRAFANA_ADMIN_PASSWORD` | optional: `deploy.sh` generates one if empty |
 | `DEMO_MODE` | `true` (uncomment the line) |
+| `LAB_ADMIN_EMAIL` | your email: the first AI Testing Lab admin |
+| `LAB_ADMIN_PASSWORD` | a strong password for that admin (8+ chars, letters and numbers) |
 
 Keep `BUSINESS_DATE` so the demo orders stay returnable. Never commit `.env`.
+
+In production only signed-in AI Testing Lab users can chat (`LAB_AUTH_REQUIRED` is forced to
+`true` by `docker-compose.prod.yml`). Visitors sign up at `/signup`; the admin manages them at `/admin`.
 
 ## 7. Deploy
 
