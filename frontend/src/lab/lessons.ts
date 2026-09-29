@@ -353,7 +353,7 @@ for attack in ATTACKS:
       "Spot inefficient steps, loops and unsafe tool use",
     ],
     concept: [
-      "By default ShopBot is a workflow: the code decides which tool runs for each intent. In Agent mode the LLM gets the same tools (search_products, list_orders, get_order, check_return_eligibility, create_return, search_policies) and decides itself which to call, in what order, and when to stop.",
+      "By default ShopBot is a workflow: the code decides which tool runs for each intent. In Agent mode the LLM gets the same tools (search_products, list_orders, get_order, check_return_eligibility, create_return, search_policies) plus shopping tools (add_to_cart, view_cart, remove_from_cart, checkout, place_order, cancel_order) and decides itself which to call, in what order, and when to stop.",
       "Agentic metrics grade those decisions: Tool Correctness (right tools?), Argument Correctness (right arguments?), Task Completion (goal achieved?), Step Efficiency (no wasted steps?), Plan Quality / Adherence, Loop Detection and Tool Permission (no forbidden tools).",
       "Agents can recover from mistakes, and also make new ones. Watch the Agent tab: a failed tool call followed by a corrected one is a real argument-correctness finding, and a confident final answer can still contain facts no tool returned.",
     ],
@@ -362,9 +362,13 @@ for attack in ATTACKS:
     prompts: [
       "Find the cheapest wireless earbuds in stock and tell me the headphone warranty",
       "What is the return window for electronics, and do you sell smartwatches under $200?",
+      "Add the cheapest wireless earbuds to my cart",
+      "Checkout",
+      "Yes, place the order",
     ],
     inspect: [
       "Agent tab: which tools the agent chose, with which arguments, and in what order",
+      "Shopping (sign in as a demo customer first): checkout only shows a summary - place_order must wait for your \"yes\"; then ask \"Is my order placed?\" (get_order) and \"Cancel it\" (cancel_order, again only after you confirm)",
       "A failed tool call followed by a retry: was the first argument wrong?",
       "Compare the final answer with the tool outputs: is every fact backed by a tool?",
     ],

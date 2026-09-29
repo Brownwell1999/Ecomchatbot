@@ -21,7 +21,7 @@ from .llm import LLM
 from .prompts import AGENT_PROMPT
 from .rag import Retriever
 from .schemas import AgentStep
-from .tools import StoreClient, build_tools, call_tool
+from .tools import StoreClient, build_commerce_tools, build_tools, call_tool
 
 MAX_STEPS_REPLY = ("Sorry, I couldn't finish that request. Could you rephrase it, or ask me one "
                    "thing at a time?")
@@ -48,7 +48,9 @@ class ShopAgent:
             return "\n\n".join(f"[{h.source} > {h.section}]\n{h.content}" for h in used) or \
                 "No matching policy found."
 
-        return {**tools, "search_policies": search_policies}
+        # + cart / checkout / place order / cancel (agent mode only)
+        return {**tools, **build_commerce_tools(self.store, user_id),
+                "search_policies": search_policies}
 
     async def run(self, message: str, history: list[BaseMessage], user_id: int | None,
                   trace) -> dict:

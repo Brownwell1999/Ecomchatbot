@@ -93,6 +93,55 @@ def build_tools(store: StoreClient, user_id: int | None) -> dict[str, BaseTool]:
                                 check_return_eligibility, create_return)}
 
 
+def build_commerce_tools(store: StoreClient, user_id: int | None) -> dict[str, BaseTool]:
+    """Cart -> checkout -> place order -> cancel. Agent mode only: the workflow (graph.py) keeps
+    using build_tools() above, unchanged. Bound to the signed-in user like the other tools."""
+
+    async def order_service(method: str, path: str, **kwargs) -> dict:
+        if user_id is None:
+            return {"error": "not_signed_in", "detail": "Ask the customer to sign in first."}
+        resp = await store.orders.request(method, path, headers=store._headers(user_id), **kwargs)
+        if 400 <= resp.status_code < 500:  # tell the agent why (empty cart, out of stock...)
+            return {"error": resp.status_code, "detail": resp.json().get("detail")}
+        resp.raise_for_status()
+        return resp.json()
+
+    @tool
+    async def view_cart() -> dict:
+        """The customer's shopping cart: items, quantities and total."""
+        return await order_service("GET", "/cart")
+
+    @tool
+    async def add_to_cart(product_id: int, quantity: int = 1) -> dict:
+        """Add a product (by id from search_products) to the customer's cart."""
+        return await order_service("POST", "/cart/items",
+                                   json={"product_id": product_id, "quantity": quantity})
+
+    @tool
+    async def remove_from_cart(product_id: int) -> dict:
+        """Remove a product from the customer's cart."""
+        return await order_service("DELETE", f"/cart/items/{product_id}")
+
+    @tool
+    async def checkout() -> dict:
+        """Order summary (items + total) for the customer to confirm. Does NOT place the order."""
+        return await order_service("GET", "/checkout")
+
+    @tool
+    async def place_order() -> dict:
+        """Place the order from the cart. Only call after the customer confirmed the checkout."""
+        return await order_service("POST", "/orders")
+
+    @tool
+    async def cancel_order(order_id: int) -> dict:
+        """Cancel one of the customer's orders (only possible while it is 'placed').
+        Only call after the customer confirmed."""
+        return await order_service("POST", f"/orders/{order_id}/cancel")
+
+    return {t.name: t for t in (view_cart, add_to_cart, remove_from_cart, checkout,
+                                place_order, cancel_order)}
+
+
 async def call_tool(tool_: BaseTool, args: dict, calls: list[ToolCall]):
     """Invoke a tool and record it for the debug trace."""
     start = time.perf_counter()

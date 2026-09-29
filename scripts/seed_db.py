@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from faker import Faker
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from shared.db.models import Base, Order, OrderItem, Product, ReturnRequest, User
 from shared.db.session import make_engine, make_sessionmaker
@@ -218,6 +218,14 @@ def build_orders(
     return orders, items
 
 
+async def sync_id_sequences(session) -> None:
+    for table in ("orders", "order_items"):
+        await session.execute(text(
+            f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+            f"(SELECT COALESCE(MAX(id), 1) FROM {table}))"))
+    await session.commit()
+
+
 async def seed() -> None:
     rng = random.Random(SEED)
     fake = Faker("en_US")
@@ -241,6 +249,9 @@ async def seed() -> None:
         await session.flush()
         session.add_all(items)
         await session.commit()
+        # Rows were inserted with explicit ids: move the id counters past them so new orders
+        # (Agent mode "place order") get fresh ids instead of a duplicate-key error
+        await sync_id_sequences(session)
 
         for model in (User, Product, Order, OrderItem, ReturnRequest):
             count = await session.scalar(select(func.count()).select_from(model))

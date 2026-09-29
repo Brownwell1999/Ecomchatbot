@@ -23,6 +23,8 @@ from shared.metrics import instrument
 from shared.proxy import ForwardedPrefixMiddleware
 from shared.security import verify_password
 
+from .cart import ensure_cart_schema
+from .cart import router as cart_router
 from .lab import ensure_lab_schema
 from .lab import router as lab_router
 
@@ -103,6 +105,7 @@ async def lifespan(app: FastAPI):
     engine = make_engine()
     app.state.sessions = make_sessionmaker(engine)
     await ensure_lab_schema(engine, settings)
+    await ensure_cart_schema(engine)
     yield
     await engine.dispose()
 
@@ -112,6 +115,7 @@ app.add_middleware(RequestIdMiddleware)
 app.add_middleware(ForwardedPrefixMiddleware)
 instrument(app, "order-service")
 app.include_router(lab_router)
+app.include_router(cart_router)
 
 
 async def get_session(request: Request):

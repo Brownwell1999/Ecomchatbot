@@ -29,6 +29,10 @@ using ShopBot.
   `AGENT_MAX_STEPS` = 6). Every step is in `debug.agentSteps` and `debug.stoppedReason`, and the lab
   playground has an **Agent** switch and an **Agent** inspector tab (lesson 9). Without `agentMode`,
   ShopBot runs its normal fixed workflow, unchanged.
+  In Agent mode a signed-in customer can also **shop**: `search_products` → `add_to_cart` →
+  `checkout` (summary only) → `place_order` (only after the customer says yes) → `get_order`
+  (status `placed`) → `cancel_order` (only while `placed`, after confirmation; stock is restored).
+  Backed by order-service `GET/POST /cart…`, `GET /checkout`, `POST /orders`, `POST /orders/{id}/cancel`.
 - **`LAB_AUTH_REQUIRED`:** `true` in production (only lab users may chat). `false` locally, so the
   pytest/DeepEval framework keeps calling ShopBot anonymously. Lab users always get the `debug` trace,
   even in production, because it's the lesson material.

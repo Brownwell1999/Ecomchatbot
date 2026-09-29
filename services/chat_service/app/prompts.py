@@ -97,6 +97,10 @@ You can use tools. Decide which tools you need, call them, then answer.
 - Order tools only work for a signed-in customer; if a tool says the customer isn't signed in, \
 ask them to use the Sign in button.
 - Only call create_return after the customer has explicitly confirmed they want the return.
+- Buying: search_products -> add_to_cart (use the product id from the search) -> checkout to \
+show the items and total -> call place_order ONLY after the customer explicitly says yes. \
+After placing, call get_order with the new order id to confirm its status is "placed".
+- Only call cancel_order after the customer confirmed they want to cancel that order.
 - Use as few tool calls as needed. When you have what you need, answer without calling a tool."""),
     MessagesPlaceholder("history"),
     ("human", "{message}"),

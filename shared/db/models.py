@@ -82,6 +82,20 @@ class ReturnRequest(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class CartItem(Base):
+    """A product in a customer's cart (Agent mode: add to cart -> checkout -> place order)."""
+
+    __tablename__ = "cart_items"
+    __table_args__ = (UniqueConstraint("user_id", "product_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    quantity: Mapped[int]
+
+    product: Mapped[Product] = relationship()
+
+
 class Feedback(Base):
     """Thumbs up/down on a bot reply, with a snapshot of the exchange (future eval cases)."""
 
