@@ -15,6 +15,7 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, Huma
 from shared.logging import request_id_var
 
 from . import metrics
+from .agent import ShopAgent
 from .graph import ChatGraph, Trace
 from .guardrails import Guardrails
 from .llm import LLMUnavailableError
@@ -42,8 +43,10 @@ def to_lc_message(m: MessageOut) -> BaseMessage:
 class ChatService:
     def __init__(self, graph: ChatGraph, store: ConversationStore, guardrails: Guardrails, *,
                  history_turns: int, primary_provider: str, debug_enabled: bool,
-                 callbacks: Callable[[str], list] = lambda request_id: []):
+                 callbacks: Callable[[str], list] = lambda request_id: [],
+                 agent: ShopAgent | None = None):
         self._graph = graph
+        self._agent = agent  # AI Testing Lab agent mode (opt-in per request)
         self._store = store
         self._guardrails = guardrails
         self._history_messages = history_turns * 2  # one turn = user + assistant
@@ -58,6 +61,7 @@ class ChatService:
         history = await self._store.history(conversation_id, limit=self._history_messages)
         dialog = await self._store.get_state(conversation_id)
         trace = Trace()
+        agent_steps, stopped_reason = [], None
 
         # 1. Input guardrails: PII masking, prompt injection (never reaches the LLM if blocked)
         safe_message, guards = await self._guardrails.check_input(request.message)
@@ -69,6 +73,17 @@ class ChatService:
                             "next_dialog": dialog}  # keep any pending question alive
             intent, confidence, nlu_source, entities = "blocked", 1.0, "guardrail", {}
             route = f"blocked:{blocked.name}"
+        elif request.agent_mode and self._agent:
+            # Agent mode: the LLM picks the tools itself (the workflow below is not used)
+            history_lc = [to_lc_message(m) for m in history]
+            result = await self._agent.run(safe_message, history_lc, request.user_id, trace)
+            result["next_dialog"] = dialog
+            agent_steps, stopped_reason = result["steps"], result["stopped_reason"]
+            intent, confidence, nlu_source, entities, route = "agent", 1.0, "agent", {}, "agent"
+            reply, out_guards = self._guardrails.check_output(result["reply"], result["grounding"])
+            guards += out_guards
+            result["reply"] = (TEMPLATES["blocked_output"]
+                               if any(g.action == "block" for g in out_guards) else reply)
         else:
             state = {"message": safe_message, "user_id": request.user_id, "dialog": dialog,
                      "history": [to_lc_message(m) for m in history], "trace": trace}
@@ -112,6 +127,8 @@ class ChatService:
             guardrails=guards,
             fallback_used=any(c.provider != self._primary for c in trace.llm_calls),
             history_messages_used=len(history),
+            agent_steps=agent_steps,
+            stopped_reason=stopped_reason,
         )
         metrics.record_turn(debug)
         return ChatResponse(conversation_id=conversation_id, message=bot_msg,

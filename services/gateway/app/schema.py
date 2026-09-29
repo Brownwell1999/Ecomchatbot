@@ -115,6 +115,15 @@ class RetrievedChunk:
 
 
 @strawberry.type
+class AgentStep:
+    step: int
+    thought: str
+    tool: str | None
+    args: JSON
+    ok: bool
+
+
+@strawberry.type
 class DebugInfo:
     request_id: str
     prompt_version: str
@@ -131,6 +140,8 @@ class DebugInfo:
     guardrails: list[GuardrailResult]
     fallback_used: bool
     history_messages_used: int
+    agent_steps: list[AgentStep] = strawberry.field(default_factory=list)
+    stopped_reason: str | None = None
 
 
 @strawberry.type
@@ -209,6 +220,8 @@ class ChatStreamEvent:
 class SendMessageInput:
     text: str
     conversation_id: str | None = None
+    agent_mode: bool = strawberry.field(
+        default=False, description="AI Testing Lab: let the LLM choose tools itself (opt-in).")
 
 
 @strawberry.input
@@ -270,6 +283,7 @@ def _debug(d: dict | None) -> DebugInfo | None:
         "llm_calls": [LLMCall(**c) for c in d["llm_calls"]],
         "retrieved_chunks": [RetrievedChunk(**c) for c in d["retrieved_chunks"]],
         "guardrails": [GuardrailResult(**g) for g in d["guardrails"]],
+        "agent_steps": [AgentStep(**s) for s in d.get("agent_steps", [])],
     })
 
 
@@ -455,7 +469,8 @@ class Mutation:
         await _rate_limit(info, user_id or (f"lab{lab_user['id']}" if lab_user else None))
         try:
             data = await _clients(info).send_message(input.conversation_id, text, user_id,
-                                                     include_debug=lab_user is not None)
+                                                     include_debug=lab_user is not None,
+                                                     agent_mode=input.agent_mode)
         except UpstreamError as exc:
             raise _error(exc.code, str(exc)) from exc
         return _response(data)
@@ -533,7 +548,8 @@ class Subscription:
         user_id = _ws_user_id(info)
         await _rate_limit(info, user_id or (f"lab{lab_user['id']}" if lab_user else None))
         async for event in _clients(info).stream_message(input.conversation_id, text, user_id,
-                                                         include_debug=lab_user is not None):
+                                                         include_debug=lab_user is not None,
+                                                         agent_mode=input.agent_mode):
             if event["type"] == "token":
                 yield ChatStreamEvent(type="token", token=event["text"])
             elif event["type"] == "final":

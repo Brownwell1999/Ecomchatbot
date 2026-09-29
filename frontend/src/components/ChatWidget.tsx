@@ -4,7 +4,7 @@ import { useChat } from "../hooks/useChat";
 import { ChatInput } from "./ChatInput";
 import { LoginPanel } from "./LoginPanel";
 import { MessageList } from "./MessageList";
-import type { DebugInfo } from "../types";
+import type { ChatMessage, DebugInfo } from "../types";
 
 const SUGGESTIONS = [
   "Show me running shoes under $100",
@@ -18,11 +18,16 @@ interface Props {
   prompts?: string[];
   /** Receives the debug trace of the latest bot reply (AI Testing Lab inspector). */
   onDebug?: (debug: DebugInfo | null) => void;
+  /** Show the "Agent mode" switch; its value is the starting state (AI Testing Lab). */
+  agentMode?: boolean;
 }
 
-export function ChatWidget({ prompts, onDebug }: Props) {
+export function ChatWidget({ prompts, onDebug, agentMode }: Props) {
   const { user, checking, login, logout } = useAuth();
-  const { conversationId, messages, pending, restoring, error, send, retry, sendFeedback, newChat } = useChat();
+  const { conversationId, messages, pending, restoring, error, send: sendText, sendFeedback, newChat } = useChat();
+  const [agent, setAgent] = useState(Boolean(agentMode));
+  const send = (text: string) => sendText(text, undefined, agent);
+  const retry = (m: ChatMessage) => sendText(m.content, m.id, agent);
   const [showLogin, setShowLogin] = useState(false);
   const empty = messages.length === 0 && !restoring;
   const latestDebug = [...messages].reverse().find((m) => m.role === "assistant")?.debug ?? null;
@@ -65,6 +70,12 @@ export function ChatWidget({ prompts, onDebug }: Props) {
               Sign in
             </button>
           ))}
+        {agentMode !== undefined && (
+          <label className="agent-toggle" title="Agent mode: the LLM chooses ShopBot's tools itself">
+            <input type="checkbox" checked={agent} onChange={(e) => setAgent(e.target.checked)} data-testid="agent-mode-toggle" />
+            <span>Agent</span>
+          </label>
+        )}
         <button className="btn-ghost" onClick={newChat} disabled={pending || messages.length === 0} data-testid="new-chat-button">
           New chat
         </button>

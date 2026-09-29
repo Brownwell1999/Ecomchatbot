@@ -32,10 +32,11 @@ class ServiceClients:
 
     # ---------- chat-service ----------
     async def send_message(self, conversation_id: str | None, text: str,
-                           user_id: int | None, include_debug: bool = False) -> dict:
+                           user_id: int | None, include_debug: bool = False,
+                           agent_mode: bool = False) -> dict:
         resp = await self._request(self._chat, "POST", "/chat", json={
             "conversation_id": conversation_id, "message": text, "user_id": user_id,
-            "include_debug": include_debug})
+            "include_debug": include_debug, "agent_mode": agent_mode})
         if resp.status_code == 503:
             raise UpstreamError("LLM_UNAVAILABLE", "The assistant is temporarily unavailable.", 503)
         if resp.status_code == 422:
@@ -46,11 +47,11 @@ class ServiceClients:
         return resp.json()
 
     async def stream_message(self, conversation_id: str | None, text: str,
-                             user_id: int | None,
-                             include_debug: bool = False) -> AsyncIterator[dict]:
+                             user_id: int | None, include_debug: bool = False,
+                             agent_mode: bool = False) -> AsyncIterator[dict]:
         """Relay chat-service server-sent events as dicts (token* then final|error)."""
         body = {"conversation_id": conversation_id, "message": text, "user_id": user_id,
-                "include_debug": include_debug}
+                "include_debug": include_debug, "agent_mode": agent_mode}
         try:
             async with self._chat.stream("POST", "/chat/stream", json=body,
                                          headers={REQUEST_ID_HEADER: request_id_var.get()}) as r:

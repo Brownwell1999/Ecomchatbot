@@ -101,6 +101,14 @@ class LLM:
         ]
         return runnables[0].with_fallbacks(runnables[1:])
 
+    def with_tools(self, tools: list) -> Runnable | None:
+        """Tool-calling chain for agent mode (LLM chooses tools). None if only fake models."""
+        real = [m for m in self.models if not isinstance(m, RuleBasedFakeChatModel)]
+        if not real:
+            return None
+        bound = [m.bind_tools(tools) for m in real]
+        return bound[0].with_fallbacks(bound[1:])
+
     @staticmethod
     async def run(runnable: Runnable, prompt_value: Any, step: str,
                   calls: list[LLMCall]) -> Any:

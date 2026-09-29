@@ -27,6 +27,8 @@ const RESPONSE_FIELDS = gql`
       llmCalls { step provider model latencyMs inputTokens outputTokens }
       retrievedChunks { chunkId collection source section score used content }
       guardrails { name stage passed action score detail }
+      agentSteps { step thought tool args ok }
+      stoppedReason
     }
   }
 `;

@@ -14,6 +14,9 @@ class ChatRequest(BaseModel):
     user_id: int | None = None  # set by the gateway from the JWT, never by the browser
     # Set by the gateway for signed-in AI Testing Lab users: the debug trace is the lesson material
     include_debug: bool = False
+    # AI Testing Lab "Agent mode" (opt-in): the LLM picks ShopBot's tools itself.
+    # Default False = the existing fixed workflow, unchanged.
+    agent_mode: bool = False
 
     @field_validator("message")
     @classmethod
@@ -93,6 +96,16 @@ class ToolCall(BaseModel):
     error: str | None = None
 
 
+class AgentStep(BaseModel):
+    """One step of the agent loop: what the LLM said, and the tool it chose (if any)."""
+
+    step: int
+    thought: str = ""  # the LLM's text alongside/instead of a tool call (its reasoning / plan)
+    tool: str | None = None
+    args: dict[str, Any] = {}
+    ok: bool = True
+
+
 class GuardrailResult(BaseModel):
     name: str  # pii | prompt_injection | prompt_guard | prompt_leak | sensitive_request | grounding
     stage: Literal["input", "output"]
@@ -128,6 +141,8 @@ class DebugInfo(BaseModel):
     guardrails: list[GuardrailResult]
     fallback_used: bool
     history_messages_used: int
+    agent_steps: list[AgentStep] = []  # agent mode only
+    stopped_reason: str | None = None  # agent mode only: final_answer | max_steps
 
 
 class ChatResponse(BaseModel):

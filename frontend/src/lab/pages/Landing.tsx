@@ -85,7 +85,7 @@ function HeroDemo() {
 const FEATURES = [
   { icon: "🤖", title: "A real RAG chatbot", text: "ShopBot runs NLU, LangGraph, pgvector retrieval, store tools and guardrails. It's a production-style target, not a toy." },
   { icon: "🔍", title: "Live inspector", text: "See intent, entities, retrieved chunks with scores, tool calls, guardrails and every LLM call behind each answer." },
-  { icon: "🧭", title: "Guided lessons", text: "Eight hands-on lessons from answer relevancy to prompt injection, each with prompts to try and what to look for." },
+  { icon: "🧭", title: "Guided lessons", text: "Nine hands-on lessons from answer relevancy to agentic AI, each with prompts to try and what to look for." },
   { icon: "🧪", title: "DeepEval-ready code", text: "Every lesson ends with a copy-paste pytest + DeepEval snippet you can run against ShopBot." },
   { icon: "🐞", title: "Planted bugs to find", text: "A wrong knowledge-base document and a flaky memory bug, so you practise catching real failures." },
   { icon: "📈", title: "Track your progress", text: "Mark lessons complete and pick up where you left off, on any device." },
@@ -130,7 +130,7 @@ export function Landing() {
               <Link to="/#curriculum" className="btn btn-ghost btn-lg">View curriculum</Link>
             </div>
             <ul className="hero-stats fade-up d4">
-              <li><b>8</b> lessons</li>
+              <li><b>9</b> lessons</li>
               <li><b>13</b> metrics</li>
               <li><b>1</b> live chatbot</li>
             </ul>
@@ -186,7 +186,7 @@ export function Landing() {
         <div className="container">
           <Reveal className="section-head">
             <span className="eyebrow">Curriculum</span>
-            <h2>Eight lessons, beginner to advanced</h2>
+            <h2>Nine lessons, beginner to advanced</h2>
           </Reveal>
           <div className="curriculum">
             {LESSONS.map((l, i) => (

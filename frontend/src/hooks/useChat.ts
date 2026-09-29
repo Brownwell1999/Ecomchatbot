@@ -68,7 +68,7 @@ export function useChat() {
   }, [client]);
 
   const send = useCallback(
-    async (text: string, retryOf?: string) => {
+    async (text: string, retryOf?: string, agentMode = false) => {
       const trimmed = text.trim();
       if (!trimmed || pending) return;
       setError(null);
@@ -92,7 +92,7 @@ export function useChat() {
       // Stream tokens into a temporary bubble; the final (guardrail-validated) reply replaces it
       await new Promise<void>((resolve) => {
         const subscription = client
-          .subscribe({ query: SEND_MESSAGE_STREAM, variables: { input: { text: trimmed, conversationId } } })
+          .subscribe({ query: SEND_MESSAGE_STREAM, variables: { input: { text: trimmed, conversationId, agentMode } } })
           .subscribe({
             next: ({ data, errors }) => {
               if (errors?.length) return fail(fromGraphQLErrors(errors));

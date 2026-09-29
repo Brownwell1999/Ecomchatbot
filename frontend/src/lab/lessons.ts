@@ -14,6 +14,8 @@ export interface Lesson {
   inspect: string[];
   /** Needs a ShopBot demo customer signed in inside the chat (orders, returns). */
   needsCustomer?: boolean;
+  /** Start the chat in Agent mode (the LLM chooses tools itself). */
+  agentMode?: boolean;
   snippet: string;
 }
 
@@ -337,6 +339,44 @@ print(metric.score, [t.name for t in called])`,
 for attack in ATTACKS:
     guards = ask(attack)["debug"]["guardrails"]  # add "guardrails { name action }" to the query
     assert any(g["action"] == "block" for g in guards), attack`,
+  },
+  {
+    id: "agentic",
+    number: 9,
+    title: "Agentic AI: tools, plans and task completion",
+    level: "Advanced",
+    minutes: 20,
+    summary: "Switch ShopBot to Agent mode, where the LLM picks its own tools, and learn how agents are evaluated.",
+    objectives: [
+      "Explain the difference between a workflow and an agent",
+      "Evaluate tool choice, tool arguments and task completion",
+      "Spot inefficient steps, loops and unsafe tool use",
+    ],
+    concept: [
+      "By default ShopBot is a workflow: the code decides which tool runs for each intent. In Agent mode the LLM gets the same tools (search_products, list_orders, get_order, check_return_eligibility, create_return, search_policies) and decides itself which to call, in what order, and when to stop.",
+      "Agentic metrics grade those decisions: Tool Correctness (right tools?), Argument Correctness (right arguments?), Task Completion (goal achieved?), Step Efficiency (no wasted steps?), Plan Quality / Adherence, Loop Detection and Tool Permission (no forbidden tools).",
+      "Agents can recover from mistakes, and also make new ones. Watch the Agent tab: a failed tool call followed by a corrected one is a real argument-correctness finding, and a confident final answer can still contain facts no tool returned.",
+    ],
+    metric: { name: "Tool Correctness", formula: "expected tools called ÷ expected tools" },
+    agentMode: true,
+    prompts: [
+      "Find the cheapest wireless earbuds in stock and tell me the headphone warranty",
+      "What is the return window for electronics, and do you sell smartwatches under $200?",
+    ],
+    inspect: [
+      "Agent tab: which tools the agent chose, with which arguments, and in what order",
+      "A failed tool call followed by a retry: was the first argument wrong?",
+      "Compare the final answer with the tool outputs: is every fact backed by a tool?",
+    ],
+    snippet: `from deepeval.metrics import ToolCorrectnessMetric
+from deepeval.test_case import LLMTestCase, ToolCall
+
+reply = ask_agent("Find the cheapest wireless earbuds in stock and tell me the headphone warranty")
+called = [ToolCall(name=t["name"], input_parameters=t["args"]) for t in reply["debug"]["toolCalls"]]
+case = LLMTestCase(input="Find the cheapest wireless earbuds ...",
+                   actual_output=reply["message"]["content"], tools_called=called,
+                   expected_tools=[ToolCall(name="search_products"), ToolCall(name="search_policies")])
+ToolCorrectnessMetric().measure(case)   # ask_agent = ask() with agentMode: true`,
   },
 ];
 

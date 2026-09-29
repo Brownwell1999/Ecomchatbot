@@ -131,7 +131,7 @@ export function LessonPage({ id }: { id: string }) {
       </article>
 
       <div className="lesson-workspace">
-        <Workspace key={lesson.id} prompts={lesson.prompts} />
+        <Workspace key={lesson.id} prompts={lesson.prompts} agentMode={lesson.agentMode} />
       </div>
     </main>
   );

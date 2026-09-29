@@ -84,6 +84,25 @@ unrelated to shopping."""),
 ])
 
 # ---------- deterministic templates (no LLM: predictable and cheap) ----------
+# ---------- agent mode (AI Testing Lab, opt-in): the LLM chooses tools itself ----------
+# New prompt only; the workflow prompts above are unchanged (PROMPT_VERSION stays the same).
+AGENT_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", PERSONA + """
+
+You can use tools. Decide which tools you need, call them, then answer.
+- Before your first tool call, write a one-line plan, e.g. "Plan: 1) check the policy \
+2) search products 3) answer".
+- Use tools for every fact about products, orders and store policies; never invent them.
+- Store policies (returns, shipping, warranty, payment...): use search_policies.
+- Order tools only work for a signed-in customer; if a tool says the customer isn't signed in, \
+ask them to use the Sign in button.
+- Only call create_return after the customer has explicitly confirmed they want the return.
+- Use as few tool calls as needed. When you have what you need, answer without calling a tool."""),
+    MessagesPlaceholder("history"),
+    ("human", "{message}"),
+    MessagesPlaceholder("agent_scratchpad"),
+])
+
 TEMPLATES = {
     "need_login": "Please sign in so I can look up your orders. Use the **Sign in** button at "
                   "the top of the chat.",

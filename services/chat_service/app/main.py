@@ -20,6 +20,7 @@ from shared.metrics import instrument
 from shared.proxy import ForwardedPrefixMiddleware
 
 from . import metrics
+from .agent import ShopAgent
 from .graph import ChatGraph, Trace
 from .guardrails import Guardrails
 from .llm import LLM, LLMUnavailableError
@@ -80,7 +81,8 @@ async def lifespan(app: FastAPI):
                    settings.rag_min_score, settings.rag_score_margin)
     products = Retriever(make_store(settings, embeddings, PRODUCT_COLLECTION),
                          PRODUCT_COLLECTION, settings.rag_min_score)
-    graph = ChatGraph(llm, StoreClient(catalog, orders), kb, products, settings)
+    store_client = StoreClient(catalog, orders)
+    graph = ChatGraph(llm, store_client, kb, products, settings)
     guardrails = Guardrails(settings, [PERSONA, CHAT_PROMPT.messages[0].prompt.template])
     callbacks, langfuse = langfuse_callbacks()
 
@@ -95,6 +97,7 @@ async def lifespan(app: FastAPI):
         primary_provider=settings.llm_provider,
         debug_enabled=settings.debug_enabled,
         callbacks=callbacks,
+        agent=ShopAgent(llm, store_client, kb, settings),
     )
     log_event(logger, "chat_service_started", models=llm.names,
               embedding_model=settings.embedding_model, prompt_version=PROMPT_VERSION,

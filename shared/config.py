@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     rag_score_margin: float = 0.10
     kb_path: str = "data/knowledge_base"
 
+    # Agent mode (AI Testing Lab, opt-in): max LLM <-> tool rounds before a safe stop
+    agent_max_steps: int = 6
+
     # Guardrails
     guardrail_classifier: str = "groq"  # groq (Llama Prompt Guard 2) | off
     guardrail_classifier_model: str = "meta-llama/llama-prompt-guard-2-86m"

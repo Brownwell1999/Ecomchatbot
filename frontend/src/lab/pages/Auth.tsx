@@ -118,7 +118,7 @@ export function Signup() {
   return (
     <AuthCard
       title="Create your account"
-      subtitle="Free access to ShopBot and all eight lessons."
+      subtitle="Free access to ShopBot and all nine lessons."
       footer={<>Already have an account? <Link to={`/login${search}`}>Log in</Link></>}
     >
       <form className="form" onSubmit={submit} data-testid="signup-form">

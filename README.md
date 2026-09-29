@@ -24,6 +24,11 @@ using ShopBot.
 - **Access:** lab accounts are separate from ShopBot's demo customers (own tables, a JWT with
   `scope: lab` in the `X-Lab-Token` header). Learners can still sign in as a demo customer inside the
   chat for the order and return lessons.
+- **Agent mode (opt-in, for agentic evaluation):** `sendMessage(input: {text, agentMode: true})`
+  lets the LLM choose ShopBot's tools itself in a loop (`services/chat_service/app/agent.py`, max
+  `AGENT_MAX_STEPS` = 6). Every step is in `debug.agentSteps` and `debug.stoppedReason`, and the lab
+  playground has an **Agent** switch and an **Agent** inspector tab (lesson 9). Without `agentMode`,
+  ShopBot runs its normal fixed workflow, unchanged.
 - **`LAB_AUTH_REQUIRED`:** `true` in production (only lab users may chat). `false` locally, so the
   pytest/DeepEval framework keeps calling ShopBot anonymously. Lab users always get the `debug` trace,
   even in production, because it's the lesson material.

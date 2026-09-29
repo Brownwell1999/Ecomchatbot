@@ -39,6 +39,8 @@ export interface DebugInfo {
   route: string;
   fallbackUsed: boolean;
   historyMessagesUsed?: number;
+  agentSteps: { step: number; thought: string; tool: string | null; args: Record<string, unknown>; ok: boolean }[];
+  stoppedReason: string | null;
   toolCalls: { name: string; args: Record<string, unknown>; output: unknown; ok: boolean; latencyMs: number; error: string | null }[];
   llmCalls: { step: string; provider: string; model: string; latencyMs: number; inputTokens: number | null; outputTokens: number | null }[];
   retrievedChunks: { chunkId: string; collection: string; source: string; section: string; score: number; used: boolean; content: string }[];

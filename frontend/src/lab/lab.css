@@ -411,3 +411,8 @@ code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-siz
   .table-tools input { max-width: none; }
   .footer-cols { gap: 32px; }
 }
+
+/* agent mode switch in the chat header */
+.agent-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; }
+.agent-toggle input { accent-color: var(--accent-1); margin: 0; }
+.agent-toggle:has(input:checked) { color: var(--text); border-color: var(--accent-1); background: color-mix(in srgb, var(--accent-1) 14%, transparent); }

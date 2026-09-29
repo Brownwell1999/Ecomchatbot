@@ -2,7 +2,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { ChatWidget } from "../components/ChatWidget";
 import type { DebugInfo } from "../types";
 
-const TABS = ["Overview", "Retrieval", "Tools", "Guardrails", "LLM calls"] as const;
+const TABS = ["Overview", "Agent", "Retrieval", "Tools", "Guardrails", "LLM calls"] as const;
 type Tab = (typeof TABS)[number];
 
 function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
@@ -22,6 +22,7 @@ export function Inspector({ debug }: { debug: DebugInfo | null }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const counts: Partial<Record<Tab, number>> = debug
     ? {
+        Agent: debug.agentSteps?.length ?? 0,
         Retrieval: debug.retrievedChunks.length,
         Tools: debug.toolCalls.length,
         Guardrails: debug.guardrails.length,
@@ -68,6 +69,33 @@ export function Inspector({ debug }: { debug: DebugInfo | null }) {
               <Empty text="No entities extracted." />
             )}
           </div>
+        ) : tab === "Agent" ? (
+          debug.agentSteps?.length ? (
+            <>
+              <ol className="chunk-list" data-testid="inspector-agent-steps">
+                {debug.agentSteps.map((s, i) => (
+                  <li key={i} className={s.ok ? "" : "hit"}>
+                    <div className="chunk-head">
+                      <span className="rank">Step {s.step}</span>
+                      {s.tool ? (
+                        <>
+                          <span className="mono">{s.tool}</span>
+                          <span className={`pill ${s.ok ? "ok" : "bad"}`}>{s.ok ? "ok" : "failed"}</span>
+                        </>
+                      ) : (
+                        <span className="pill ok">final answer</span>
+                      )}
+                    </div>
+                    {s.thought && <p className="muted small">{s.thought}</p>}
+                    {s.tool && <pre className="code small">args: {JSON.stringify(s.args, null, 2)}</pre>}
+                  </li>
+                ))}
+              </ol>
+              <p className="muted small">Stopped: {debug.stoppedReason}</p>
+            </>
+          ) : (
+            <Empty text="Turn on Agent mode in the chat header: the LLM will choose ShopBot's tools itself, and every step shows up here." />
+          )
         ) : tab === "Retrieval" ? (
           debug.retrievedChunks.length ? (
             <ol className="chunk-list">
@@ -158,12 +186,12 @@ export function Inspector({ debug }: { debug: DebugInfo | null }) {
 }
 
 /** ShopBot chat + inspector side by side: the lab's working area. */
-export function Workspace({ prompts }: { prompts?: string[] }) {
+export function Workspace({ prompts, agentMode = false }: { prompts?: string[]; agentMode?: boolean }) {
   const [debug, setDebug] = useState<DebugInfo | null>(null);
   const onDebug = useCallback((d: DebugInfo | null) => setDebug(d), []);
   return (
     <div className="workspace">
-      <ChatWidget prompts={prompts} onDebug={onDebug} />
+      <ChatWidget prompts={prompts} onDebug={onDebug} agentMode={agentMode} />
       <Inspector debug={debug} />
     </div>
   );
