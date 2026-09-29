@@ -154,8 +154,8 @@ class ChatService:
             else:
                 message, meta = chunk
                 if (meta.get("langgraph_node") in STREAM_NODES
-                        and isinstance(message, AIMessageChunk) and message.content):
-                    on_token(str(message.content))
+                        and isinstance(message, AIMessageChunk) and message.text):
+                    on_token(message.text)
         return final
 
     async def chat_stream(self, request: ChatRequest) -> AsyncIterator[dict]:

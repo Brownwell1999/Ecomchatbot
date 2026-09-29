@@ -5,6 +5,7 @@ import re
 import time
 from typing import Any
 
+from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
@@ -67,6 +68,13 @@ def _chat_model(name: str, s: Settings) -> BaseChatModel:
             return ChatGroq(model_name=s.groq_model, api_key=s.groq_api_key,
                             temperature=s.llm_temperature, max_tokens=s.llm_max_tokens,
                             request_timeout=s.llm_timeout_seconds, max_retries=1, **extra)
+        case "anthropic":
+            if not s.anthropic_api_key:
+                raise ValueError("ANTHROPIC_API_KEY is not set")
+            # No temperature: current Claude models reject custom sampling settings
+            return ChatAnthropic(model=s.anthropic_model, api_key=s.anthropic_api_key,
+                                 max_tokens=s.llm_max_tokens, timeout=s.llm_timeout_seconds,
+                                 max_retries=1)
         case "ollama":
             return ChatOllama(model=s.ollama_model, base_url=s.ollama_api_base,
                               temperature=s.llm_temperature, num_predict=s.llm_max_tokens)
@@ -96,7 +104,9 @@ class LLM:
         runnables = [
             m.with_structured_output(
                 schema, include_raw=True,
-                method="json_schema" if isinstance(m, ChatOllama) else "function_calling")
+                # Claude: structured outputs (current models reject forced tool calls)
+                method="json_schema" if isinstance(m, (ChatOllama, ChatAnthropic))
+                else "function_calling")
             for m in real
         ]
         return runnables[0].with_fallbacks(runnables[1:])

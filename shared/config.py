@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     groq_model: str = "openai/gpt-oss-20b"
     ollama_model: str = "llama3.2:3b"
     ollama_api_base: str = "http://localhost:11434"
+    # Claude (LLM_PROVIDER=anthropic): e.g. while the Groq free quota is used up
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-5-5"
 
     # RAG
     embedding_provider: str = "ollama"  # ollama | fake

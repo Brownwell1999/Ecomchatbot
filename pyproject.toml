@@ -26,6 +26,7 @@ dependencies = [
     "prometheus-client>=0.26.0",
     "langfuse>=4.15.4",
     "langchain>=1.4.2",
+    "langchain-anthropic>=1.0",
 ]
 
 [dependency-groups]

@@ -93,9 +93,18 @@ def build_tools(store: StoreClient, user_id: int | None) -> dict[str, BaseTool]:
                                 check_return_eligibility, create_return)}
 
 
-def build_commerce_tools(store: StoreClient, user_id: int | None) -> dict[str, BaseTool]:
+NEEDS_CONFIRMATION = {"error": "needs_confirmation",
+                      "detail": "Do not do this yet: show the customer what will happen and ask "
+                                "them to reply yes. Only call this tool after they confirm."}
+
+
+def build_commerce_tools(store: StoreClient, user_id: int | None,
+                         confirmed: bool = False) -> dict[str, BaseTool]:
     """Cart -> checkout -> place order -> cancel. Agent mode only: the workflow (graph.py) keeps
-    using build_tools() above, unchanged. Bound to the signed-in user like the other tools."""
+    using build_tools() above, unchanged. Bound to the signed-in user like the other tools.
+
+    confirmed: the customer's CURRENT message is an explicit yes. place_order and cancel_order
+    refuse to run without it - enforced here in code, not just asked for in the prompt."""
 
     async def order_service(method: str, path: str, **kwargs) -> dict:
         if user_id is None:
@@ -130,12 +139,16 @@ def build_commerce_tools(store: StoreClient, user_id: int | None) -> dict[str, B
     @tool
     async def place_order() -> dict:
         """Place the order from the cart. Only call after the customer confirmed the checkout."""
+        if not confirmed:
+            return NEEDS_CONFIRMATION
         return await order_service("POST", "/orders")
 
     @tool
     async def cancel_order(order_id: int) -> dict:
         """Cancel one of the customer's orders (only possible while it is 'placed').
         Only call after the customer confirmed."""
+        if not confirmed:
+            return NEEDS_CONFIRMATION
         return await order_service("POST", f"/orders/{order_id}/cancel")
 
     return {t.name: t for t in (view_cart, add_to_cart, remove_from_cart, checkout,

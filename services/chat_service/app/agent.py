@@ -11,6 +11,7 @@ Every step is recorded (thought, tool, args) so agentic metrics can grade it.
 """
 
 import json
+import re
 
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.tools import tool
@@ -22,6 +23,10 @@ from .prompts import AGENT_PROMPT
 from .rag import Retriever
 from .schemas import AgentStep
 from .tools import StoreClient, build_commerce_tools, build_tools, call_tool
+
+# The customer's message is an explicit confirmation ("Yes, place the order", "ok", "go ahead")
+CONFIRM_RE = re.compile(r"^\s*(yes|yeah|yep|sure|ok|okay|confirm(ed)?|go ahead|please do|do it)\b",
+                        re.I)
 
 MAX_STEPS_REPLY = ("Sorry, I couldn't finish that request. Could you rephrase it, or ask me one "
                    "thing at a time?")
@@ -36,7 +41,7 @@ class ShopAgent:
         self.max_steps = settings.agent_max_steps
         self.top_k = settings.rag_top_k
 
-    def tools(self, user_id: int | None, trace) -> dict:
+    def tools(self, user_id: int | None, trace, confirmed: bool = False) -> dict:
         tools = build_tools(self.store, user_id)  # same tools as the workflow, bound to the user
 
         @tool
@@ -49,12 +54,12 @@ class ShopAgent:
                 "No matching policy found."
 
         # + cart / checkout / place order / cancel (agent mode only)
-        return {**tools, **build_commerce_tools(self.store, user_id),
+        return {**tools, **build_commerce_tools(self.store, user_id, confirmed),
                 "search_policies": search_policies}
 
     async def run(self, message: str, history: list[BaseMessage], user_id: int | None,
                   trace) -> dict:
-        tools = self.tools(user_id, trace)
+        tools = self.tools(user_id, trace, confirmed=bool(CONFIRM_RE.match(message)))
         model = self.llm.with_tools(list(tools.values()))
         if model is None:  # only the fake model is configured: it can't call tools
             return {"reply": UNAVAILABLE_REPLY, "steps": [], "stopped_reason": "unavailable",
@@ -68,7 +73,7 @@ class ShopAgent:
             ai: AIMessage = await LLM.run(model, prompt, "agent", trace.llm_calls)
             # Reasoning models (gpt-oss on Groq) put their thinking in a separate field and leave
             # the text empty when they call tools: use it as the step's thought / plan
-            thought = (str(ai.content).strip()
+            thought = (ai.text.strip()
                        or str(ai.additional_kwargs.get("reasoning_content", "")).strip())
 
             if not ai.tool_calls:  # no tool needed -> this is the final answer

@@ -5,7 +5,7 @@ from itertools import repeat
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 
-from services.chat_service.app.agent import ShopAgent
+from services.chat_service.app.agent import CONFIRM_RE, ShopAgent
 from services.chat_service.app.graph import Trace
 from shared.config import Settings
 
@@ -67,3 +67,16 @@ async def test_agent_unavailable_without_a_tool_calling_model():
     agent = ShopAgent(FakeOnlyLLM(), FakeStore(), FakeKB(), Settings())
     result = await agent.run("hi", [], None, Trace())
     assert result["stopped_reason"] == "unavailable"
+
+
+async def test_cancel_needs_an_explicit_yes():
+    """The bug found in manual testing: 'cancel the order I just placed' cancelled at once."""
+    cancel = AIMessage(content="", tool_calls=[
+        {"name": "cancel_order", "args": {"order_id": 1303}, "id": "c1"}])
+
+    trace = Trace()
+    await make_agent([cancel, AIMessage(content="Shall I cancel #1303?")]).run(
+        "Actually, cancel the order I just placed", [], 7, trace)
+    assert trace.tool_calls[0].output["error"] == "needs_confirmation"  # blocked in code
+
+    assert CONFIRM_RE.match("Yes, cancel it") and not CONFIRM_RE.match("Please cancel order 1302")

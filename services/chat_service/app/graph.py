@@ -112,7 +112,7 @@ class ChatGraph:
         value = prompt.invoke({"history": state["history"], "message": state["message"],
                                **variables})
         message = await LLM.run(self.llm.chat, value, step, state["trace"].llm_calls)
-        return str(message.content).strip()
+        return message.text.strip()
 
     @staticmethod
     def template(key: str):
