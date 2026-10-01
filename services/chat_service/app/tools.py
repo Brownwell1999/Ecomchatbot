@@ -59,14 +59,17 @@ def build_tools(store: StoreClient, user_id: int | None) -> dict[str, BaseTool]:
     async def search_products(query: str | None = None, category: str | None = None,
                               brand: str | None = None, min_price: float | None = None,
                               max_price: float | None = None, in_stock: bool = False) -> dict:
-        """Keyword search in the product catalog with optional filters."""
+        """Keyword search in the product catalog with optional filters. Results include each
+        product's id. category must be exactly one of: electronics, fashion, footwear,
+        home_kitchen, beauty, sports - for anything else (e.g. "earbuds") use query instead."""
         return await store.search_products(q=query, category=category, brand=brand,
                                            min_price=min_price, max_price=max_price,
                                            in_stock=in_stock, limit=6)
 
     @tool
     async def get_products(ids: list[int]) -> list[dict]:
-        """Fetch products by id (used after semantic search)."""
+        """Full details (description, price, stock, rating) of products by id. Use this when
+        the customer asks to see a product's details."""
         return await store.get_products(ids)
 
     @tool
@@ -75,9 +78,11 @@ def build_tools(store: StoreClient, user_id: int | None) -> dict[str, BaseTool]:
         return await store._order_get(f"/orders/{order_id}", user_id)
 
     @tool
-    async def list_orders(limit: int = 5) -> list[dict]:
-        """The signed-in customer's most recent orders."""
-        return await store._order_get(f"/orders?limit={limit}", user_id) or []
+    async def list_orders(limit: int = 5, status: str | None = None) -> list[dict]:
+        """The signed-in customer's most recent orders, newest first. Optional status filter:
+        placed, shipped, out_for_delivery, delivered, cancelled or returned."""
+        path = f"/orders?limit={limit}" + (f"&status={status}" if status else "")
+        return await store._order_get(path, user_id) or []
 
     @tool
     async def check_return_eligibility(order_id: int) -> dict | None:
@@ -98,13 +103,20 @@ NEEDS_CONFIRMATION = {"error": "needs_confirmation",
                                 "them to reply yes. Only call this tool after they confirm."}
 
 
-def build_commerce_tools(store: StoreClient, user_id: int | None,
-                         confirmed: bool = False) -> dict[str, BaseTool]:
+UNKNOWN_PRODUCT = {"error": "unknown_product",
+                   "detail": "That product id did not come from a search in this turn. Call "
+                             "search_products (or get_products) first and use an id from it."}
+
+
+def build_commerce_tools(store: StoreClient, user_id: int | None, confirmed: bool = False,
+                         known_product_ids=lambda: None) -> dict[str, BaseTool]:
     """Cart -> checkout -> place order -> cancel. Agent mode only: the workflow (graph.py) keeps
     using build_tools() above, unchanged. Bound to the signed-in user like the other tools.
 
     confirmed: the customer's CURRENT message is an explicit yes. place_order and cancel_order
-    refuse to run without it - enforced here in code, not just asked for in the prompt."""
+    refuse to run without it - enforced here in code, not just asked for in the prompt.
+    known_product_ids: ids the agent really got from search_products/get_products this turn;
+    add_to_cart refuses any other id, so a model can't order a product id it made up."""
 
     async def order_service(method: str, path: str, **kwargs) -> dict:
         if user_id is None:
@@ -123,6 +135,9 @@ def build_commerce_tools(store: StoreClient, user_id: int | None,
     @tool
     async def add_to_cart(product_id: int, quantity: int = 1) -> dict:
         """Add a product (by id from search_products) to the customer's cart."""
+        known = known_product_ids()
+        if known is not None and product_id not in known:
+            return UNKNOWN_PRODUCT
         return await order_service("POST", "/cart/items",
                                    json={"product_id": product_id, "quantity": quantity})
 

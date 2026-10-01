@@ -217,8 +217,12 @@ async def get_user(user_id: int, session: Session):
 
 @app.get("/orders", response_model=list[OrderOut])
 async def my_orders(session: Session, user_id: UserId,
-                    limit: Annotated[int, Query(ge=1, le=20)] = 5):
-    stmt = (select(Order).where(Order.user_id == user_id).order_by(Order.placed_at.desc())
+                    limit: Annotated[int, Query(ge=1, le=20)] = 5,
+                    status: str | None = None):
+    stmt = select(Order).where(Order.user_id == user_id)
+    if status:  # e.g. delivered - lets the agent ask for "my last delivered order"
+        stmt = stmt.where(Order.status == status)
+    stmt = (stmt.order_by(Order.placed_at.desc())
             .limit(limit).options(selectinload(Order.items).selectinload(OrderItem.product)))
     return [to_out(o) for o in await session.scalars(stmt)]
 

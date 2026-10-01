@@ -80,3 +80,14 @@ async def test_cancel_needs_an_explicit_yes():
     assert trace.tool_calls[0].output["error"] == "needs_confirmation"  # blocked in code
 
     assert CONFIRM_RE.match("Yes, cancel it") and not CONFIRM_RE.match("Please cancel order 1302")
+
+
+async def test_add_to_cart_rejects_a_product_id_the_agent_never_looked_up():
+    """The bug found in manual testing: a weak model added a product id it had invented."""
+    add = AIMessage(content="", tool_calls=[
+        {"name": "add_to_cart", "args": {"product_id": 99}, "id": "a1"}])
+
+    trace = Trace()
+    await make_agent([add, AIMessage(content="Let me search first.")]).run(
+        "add the earbuds to my cart", [], 7, trace)
+    assert trace.tool_calls[0].output["error"] == "unknown_product"

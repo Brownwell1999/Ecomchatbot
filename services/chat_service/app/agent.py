@@ -53,8 +53,17 @@ class ShopAgent:
             return "\n\n".join(f"[{h.source} > {h.section}]\n{h.content}" for h in used) or \
                 "No matching policy found."
 
+        def seen_product_ids() -> set[int]:
+            """Product ids the agent really got from the catalog in this turn."""
+            ids = set()
+            for call in trace.tool_calls:
+                if call.ok and call.name in ("search_products", "get_products"):
+                    items = call.output["items"] if isinstance(call.output, dict) else call.output
+                    ids.update(item["id"] for item in items or [])
+            return ids
+
         # + cart / checkout / place order / cancel (agent mode only)
-        return {**tools, **build_commerce_tools(self.store, user_id, confirmed),
+        return {**tools, **build_commerce_tools(self.store, user_id, confirmed, seen_product_ids),
                 "search_policies": search_policies}
 
     async def run(self, message: str, history: list[BaseMessage], user_id: int | None,
@@ -79,7 +88,7 @@ class ShopAgent:
             if not ai.tool_calls:  # no tool needed -> this is the final answer
                 steps.append(AgentStep(step=number, thought=thought))
                 return {"reply": thought, "steps": steps, "stopped_reason": "final_answer",
-                        "grounding": self._grounding(message, trace)}
+                        "grounding": self._grounding(message, history, trace)}
 
             scratchpad.append(ai)
             for call in ai.tool_calls:
@@ -98,8 +107,10 @@ class ShopAgent:
                 "grounding": message}
 
     @staticmethod
-    def _grounding(message: str, trace) -> str:
-        """Text the reply may take facts from (tool outputs + used policy chunks)."""
+    def _grounding(message: str, history: list[BaseMessage], trace) -> str:
+        """Text the reply may take facts from: tool outputs, used policy chunks, and the
+        conversation so far (so "cancel order #1301?" isn't blocked for a number that came
+        from an earlier turn)."""
         outputs = [json.dumps(c.output, default=str) for c in trace.tool_calls if c.ok]
         chunks = [c.content for c in trace.chunks if c.used]
-        return "\n".join([message, *outputs, *chunks])
+        return "\n".join([message, *(m.text for m in history), *outputs, *chunks])
